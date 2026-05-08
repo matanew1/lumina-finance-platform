@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, DateTime, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.models.base import Base
+from backend.db.models.base import Base
 
 
 class Transaction(Base):
@@ -12,7 +12,7 @@ class Transaction(Base):
     __table_args__ = (
         CheckConstraint("action IN ('buy', 'sell')", name="transaction_action_valid"),
         CheckConstraint("quantity > 0", name="transaction_quantity_positive"),
-        CheckConstraint("price >= 0", name="transaction_price_non_negative"),
+        CheckConstraint("price > 0", name="transaction_price_positive"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

@@ -1,8 +1,8 @@
 # Lumina Finance Platform
 
-A skeleton finance platform with a FastAPI backend, PostgreSQL database, SQLAlchemy models, Swagger UI, and a simple React frontend.
+A finance platform skeleton with a FastAPI backend, PostgreSQL database, SQLAlchemy models, Swagger UI, and a simple React frontend.
 
-The API and service business logic is intentionally left as TODOs. The database infrastructure and project setup are runnable.
+Transaction upload ingestion and validation are implemented. The remaining API/service business logic is intentionally left as TODOs.
 
 ## Tech Stack
 
@@ -15,16 +15,15 @@ The API and service business logic is intentionally left as TODOs. The database 
 
 ```text
 backend/
-  controller/      API controller layer
   db/              database engine, sessions, initialization helpers
-  models/          SQLAlchemy models
-  routes/          FastAPI route declarations
+    models/        SQLAlchemy models
+    repositories/  database access layer
+  controllers/     FastAPI route declarations and controller classes
   samples/         sample input files
   schemas/         Pydantic request/response schemas
-  secrets/         local environment files
   services/        business service layer
   tests/           backend tests
-  utils/           shared utilities and settings
+  utils/           shared utilities, local secrets, and sample files
 frontend/
   src/             React UI skeleton
 docker-compose.yml
@@ -50,7 +49,7 @@ python -m pip install -r requirements.txt
 Create the local backend environment file:
 
 ```bash
-cp backend/secrets/.env.example backend/secrets/.env
+cp backend/utils/secrets/.env.example backend/utils/secrets/.env
 ```
 
 Default database URL:
@@ -124,7 +123,7 @@ http://127.0.0.1:5173
 The sample workbook is stored at:
 
 ```text
-backend/samples/transactions_sample.xlsx
+backend/utils/samples/transactions_sample.xlsx
 ```
 
 It contains these transaction columns:
@@ -175,7 +174,8 @@ docker compose down -v
 
 ## Notes
 
-- `backend/secrets/.env` is ignored by git and should contain local secrets only.
-- `backend/secrets/.env.example` is the shareable template.
-- API/service methods currently return TODO responses or raise TODO implementation placeholders.
+- `backend/utils/secrets/.env` is ignored by git and should contain local secrets only.
+- `backend/utils/secrets/.env.example` is the shareable template.
+- `POST /upload-transactions` parses, normalizes, validates, and persists valid transactions.
+- The remaining API/service methods currently return TODO responses or raise TODO implementation placeholders.
 - Database tables are created directly from SQLAlchemy metadata.
