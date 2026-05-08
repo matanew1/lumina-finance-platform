@@ -50,4 +50,3 @@ class TransactionUploadResponse(BaseModel):
     invalid_rows: int
     persisted_rows: int
     errors: list[TransactionUploadError] = Field(default_factory=list)
-    transactions: list[TransactionBase] = Field(default_factory=list)

@@ -13,7 +13,7 @@ from backend.utils.dataframe_utils import (
     normalize_string,
     validation_error,
 )
-from backend.utils.upload_utils import read_excel_upload
+from backend.utils.upload_utils import read_tabular_upload
 
 REQUIRED_COLUMNS = (
     "client_id",
@@ -39,12 +39,12 @@ STRING_COLUMNS = ("client_id", "transaction_id", "isin", "action")
 VALID_ACTIONS = {"buy", "sell"}
 
 
-async def read_transaction_excel(file: UploadFile) -> pd.DataFrame:
-    return await read_excel_upload(
+async def read_transaction_file(file: UploadFile) -> pd.DataFrame:
+    return await read_tabular_upload(
         file,
-        unsupported_message="Only .xlsx transaction files are supported.",
+        unsupported_message="Only .csv or .xlsx transaction files are supported.",
         empty_message="Uploaded transaction file is empty.",
-        parse_error_message="Unable to parse uploaded Excel file.",
+        parse_error_message="Unable to parse uploaded transaction file.",
         empty_dataframe_message="Uploaded transaction file contains no transaction rows.",
     )
 

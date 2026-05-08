@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import Field
@@ -7,11 +6,17 @@ from backend.schemas.common import OrmSchema
 
 
 class PositionRead(OrmSchema):
-    id: int
     client_id: str = Field(examples=["C001"])
     isin: str = Field(examples=["US1234567890"])
     quantity: Decimal = Field(examples=["30"])
-    average_price: Decimal = Field(examples=["100.5"])
-    updated_at: datetime
+    average_cost: Decimal = Field(examples=["100.5"])
+    market_price: Decimal = Field(examples=["105.2"])
+    realized_pnl: Decimal = Field(examples=["94"])
+    unrealized_pnl: Decimal = Field(examples=["141"])
 
-    # TODO: align this schema with stored-versus-computed position decisions.
+
+class ClientPositionsResponse(OrmSchema):
+    client_id: str = Field(examples=["C001"])
+    positions: list[PositionRead]
+    total_realized_pnl: Decimal = Field(examples=["94"])
+    total_unrealized_pnl: Decimal = Field(examples=["141"])

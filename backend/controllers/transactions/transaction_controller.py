@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from backend.db.session import get_db
 from backend.schemas.transaction_schema import TransactionUploadResponse
 from backend.services.transactions.transaction_service import TransactionService
-from backend.utils.exceptions import ConflictError, PersistenceError
+from backend.utils.exceptions import ConflictError, PersistenceError, BadRequestError
 
 router = APIRouter(tags=["transactions"])
 
@@ -17,11 +17,11 @@ class TransactionController:
         try:
             return await self.service.upload_transactions(file=file)
         except ConflictError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        except BadRequestError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         except PersistenceError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 def get_transaction_controller(db: Session = Depends(get_db)) -> TransactionController:

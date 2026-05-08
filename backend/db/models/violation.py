@@ -18,5 +18,6 @@ class Violation(Base):
         nullable=True,
     )
     violation_type: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now(), nullable=False)

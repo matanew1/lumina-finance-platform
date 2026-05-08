@@ -1,13 +1,13 @@
 # Lumina Finance Platform
 
-A finance platform skeleton with a FastAPI backend, PostgreSQL database, SQLAlchemy models, Swagger UI, and a simple React frontend.
+A finance platform skeleton with a FastAPI backend, SQLAlchemy models, PostgreSQL/SQLite database support, Swagger UI, and a simple React frontend.
 
-Transaction upload ingestion and validation are implemented. The remaining API/service business logic is intentionally left as TODOs.
+Transaction upload ingestion, validation, client listing, FIFO position calculation, violation detection, and analytics are implemented.
 
 ## Tech Stack
 
 - Backend: Python, FastAPI, SQLAlchemy, pandas
-- Database: PostgreSQL
+- Database: PostgreSQL with Docker Compose; SQLite is also supported by changing `DATABASE_URL`
 - Frontend: React with Vite
 - API docs: Swagger UI through FastAPI
 
@@ -18,10 +18,10 @@ backend/
   db/              database engine, sessions, initialization helpers
     models/        SQLAlchemy models
     repositories/  database access layer
-  controllers/     FastAPI route declarations and controller classes
+  controllers/     feature-based FastAPI controller packages
   samples/         sample input files
   schemas/         Pydantic request/response schemas
-  services/        business service layer
+  services/        feature-based business service packages
   tests/           backend tests
   utils/           shared utilities, local secrets, and sample files
 frontend/
@@ -34,7 +34,7 @@ requirements.txt
 
 - Python 3.11+
 - Node.js 20+
-- Docker Desktop or Docker Engine
+- Docker Desktop or Docker Engine, only if using PostgreSQL instead of SQLite
 
 ## 1. Backend Environment
 
@@ -52,13 +52,21 @@ Create the local backend environment file:
 cp backend/utils/secrets/.env.example backend/utils/secrets/.env
 ```
 
-Default database URL:
+Default PostgreSQL database URL:
 
 ```text
 postgresql+psycopg://postgres:postgres@localhost:5432/lumina_finance
 ```
 
-## 2. Start PostgreSQL
+SQLite fallback URL, if you want to run without Docker:
+
+```text
+sqlite:///./lumina_finance.db
+```
+
+## 2. Choose And Initialize The Database
+
+### Option A: PostgreSQL With Docker Compose
 
 ```bash
 docker compose up -d postgres
@@ -70,7 +78,19 @@ Check that the container is running:
 docker compose ps
 ```
 
-Initialize the database tables:
+### Option B: SQLite Without Docker
+
+Change `DATABASE_URL` in `backend/utils/secrets/.env` to:
+
+```text
+sqlite:///./lumina_finance.db
+```
+
+This creates a local `lumina_finance.db` file in the project root when tables are initialized.
+
+### Initialize Tables
+
+Initialize the database tables for either PostgreSQL or SQLite:
 
 ```bash
 python -m backend.db.init_db
@@ -126,7 +146,7 @@ The sample workbook is stored at:
 backend/utils/samples/transactions_sample.xlsx
 ```
 
-It contains these transaction columns:
+Uploads support `.xlsx` and `.csv` files with these transaction columns:
 
 - `ClientId`
 - `TransactionId`
@@ -176,6 +196,10 @@ docker compose down -v
 
 - `backend/utils/secrets/.env` is ignored by git and should contain local secrets only.
 - `backend/utils/secrets/.env.example` is the shareable template.
-- `POST /upload-transactions` parses, normalizes, validates, and persists valid transactions.
-- The remaining API/service methods currently return TODO responses or raise TODO implementation placeholders.
+- PostgreSQL is the recommended setup for this project, and SQLite can be used by changing only `DATABASE_URL`.
+- `POST /upload-transactions` parses CSV/XLSX files, normalizes and validates transactions, applies FIFO in chronological order, persists transactions, stores refreshed current positions, and returns only an upload summary.
+- `GET /clients` lists distinct client IDs from transaction data.
+- `GET /clients/{client_id}/positions` reads stored positions per ISIN with realized and unrealized P&L.
+- `GET /violations` reads persisted compliance violations.
+- `GET /analytics` returns top traded ISINs, client holding-time averages, the most volatile client, and ISIN concentration reports.
 - Database tables are created directly from SQLAlchemy metadata.
