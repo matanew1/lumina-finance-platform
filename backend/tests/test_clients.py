@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from backend.db.session import get_db
 from backend.main import app
-from backend.services.client_service import ClientService
+from backend.services.clients.client_service import ClientService
 
 
 class FakeClientRepository:

@@ -12,7 +12,7 @@ class PositionRepository(BaseRepository):
         statement = select(Position).where(Position.client_id == client_id).order_by(Position.isin.asc())
         return list(self.db.scalars(statement).all())
 
-    def update_client_positions(self, client_ids: Iterable[str], positions: list[dict[str, Any]]) -> None:
+    def update_clients_positions(self, client_ids: Iterable[str], positions: list[dict[str, Any]]) -> None:
         client_id_list = list(client_ids)
         if not client_id_list:
             return

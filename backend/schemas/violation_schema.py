@@ -10,8 +10,7 @@ class ViolationRead(OrmSchema):
     id: int
     client_id: str = Field(examples=["C001"])
     transaction_id: Optional[str] = Field(default=None, examples=["T1002"])
-    violation_type: str = Field(examples=["negative_position"])
-    message: str
+    violation_type: str = Field(examples=["DAY_TRADING"])
+    severity: str = Field(examples=["WARNING"])
+    message: str = Field(examples=["4 buy/sell pairs of US1234567890 within 24h (limit: 3)."])
     created_at: datetime
-
-    # TODO: add severity, status, and remediation fields once compliance rules are defined.

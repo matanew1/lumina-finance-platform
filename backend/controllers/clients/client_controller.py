@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.schemas.client_schema import ClientRead
-from backend.services.client_service import ClientService
+from backend.services.clients.client_service import ClientService
 
 router = APIRouter(tags=["clients"])
 
