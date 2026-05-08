@@ -1,5 +1,5 @@
-from backend.models.base import Base
-from backend import models  # noqa: F401
+from backend.db.models.base import Base
+from backend.db import models  # noqa: F401
 
 
 def test_database_metadata_contains_required_tables() -> None:

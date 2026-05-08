@@ -1,6 +1,6 @@
 from sqlalchemy import inspect
 
-from backend.models.base import Base
+from backend.db.models.base import Base
 from backend.db.session import check_database_connection, engine
 
 

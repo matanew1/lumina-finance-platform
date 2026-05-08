@@ -5,7 +5,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-SECRETS_DIR = BACKEND_DIR / "secrets"
+SECRETS_DIR = BACKEND_DIR / "utils" / "secrets"
 
 
 class Settings(BaseSettings):
