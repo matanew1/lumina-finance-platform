@@ -1,5 +1,7 @@
+from collections.abc import Iterable
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from backend.db.models.transaction import Transaction
@@ -9,15 +11,31 @@ from backend.utils.exceptions import ConflictError, PersistenceError
 
 
 class TransactionRepository(BaseRepository):
-    def bulk_create(self, records: list[dict[str, Any]]) -> None:
-        transactions = [Transaction(**record) for record in records]
+    def list_for_clients_ordered(self, client_ids: Iterable[str]) -> list[Transaction]:
+        client_id_list = list(client_ids)
+        if not client_id_list:
+            return []
 
+        statement = (
+            select(Transaction)
+            .where(Transaction.client_id.in_(client_id_list))
+            .order_by(Transaction.timestamp.asc(), Transaction.id.asc())
+        )
+        return list(self.db.scalars(statement).all())
+
+    def add_records(self, records: list[dict[str, Any]]) -> list[Transaction]:
+        transactions = [Transaction(**record) for record in records]
+        self.db.add_all(transactions)
+        self.db.flush()
+        return transactions
+
+    def bulk_create(self, records: list[dict[str, Any]]) -> None:
         try:
-            self.db.add_all(transactions)
+            self.add_records(records)
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            if self._is_duplicate_transaction_id_error(exc):
+            if self.is_duplicate_transaction_id_error(exc):
                 raise ConflictError("One or more transactions have duplicate transaction IDs.") from exc
             raise PersistenceError("Failed to persist uploaded transactions.") from exc
         except SQLAlchemyError as exc:
@@ -25,7 +43,7 @@ class TransactionRepository(BaseRepository):
             raise PersistenceError("Failed to persist uploaded transactions.") from exc
 
     @staticmethod
-    def _is_duplicate_transaction_id_error(exc: IntegrityError) -> bool:
+    def is_duplicate_transaction_id_error(exc: IntegrityError) -> bool:
         return is_unique_constraint_error(
             exc,
             field_markers=(

@@ -1,8 +1,8 @@
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 from fastapi import UploadFile
-
 
 
 def has_allowed_extension(filename: str | None, allowed_extensions: tuple[str, ...]) -> bool:
@@ -46,6 +46,38 @@ async def read_excel_upload(
 
     try:
         dataframe = pd.read_excel(BytesIO(contents), engine="openpyxl")
+    except Exception as exc:
+        raise ValueError(parse_error_message) from exc
+
+    if dataframe.empty:
+        raise ValueError(empty_dataframe_message)
+
+    return dataframe
+
+
+async def read_tabular_upload(
+    file: UploadFile,
+    *,
+    allowed_extensions: tuple[str, ...] = (".csv", ".xlsx"),
+    unsupported_message: str = "Only CSV or Excel files are supported.",
+    empty_message: str = "Uploaded file is empty.",
+    parse_error_message: str = "Unable to parse uploaded file.",
+    empty_dataframe_message: str = "Uploaded file contains no rows.",
+) -> pd.DataFrame:
+    contents = await read_upload_bytes(
+        file,
+        allowed_extensions=allowed_extensions,
+        unsupported_message=unsupported_message,
+        empty_message=empty_message,
+    )
+
+    file_extension = Path(file.filename or "").suffix.lower()
+
+    try:
+        if file_extension == ".csv":
+            dataframe = pd.read_csv(BytesIO(contents))
+        else:
+            dataframe = pd.read_excel(BytesIO(contents), engine="openpyxl")
     except Exception as exc:
         raise ValueError(parse_error_message) from exc
 

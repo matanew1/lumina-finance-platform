@@ -2,7 +2,7 @@
 
 A finance platform skeleton with a FastAPI backend, PostgreSQL database, SQLAlchemy models, Swagger UI, and a simple React frontend.
 
-Transaction upload ingestion and validation are implemented. The remaining API/service business logic is intentionally left as TODOs.
+Transaction upload ingestion, validation, client listing, FIFO position calculation, and P&L logic are implemented. The remaining API/service business logic is intentionally left as TODOs.
 
 ## Tech Stack
 
@@ -126,7 +126,7 @@ The sample workbook is stored at:
 backend/utils/samples/transactions_sample.xlsx
 ```
 
-It contains these transaction columns:
+Uploads support `.xlsx` and `.csv` files with these transaction columns:
 
 - `ClientId`
 - `TransactionId`
@@ -176,6 +176,8 @@ docker compose down -v
 
 - `backend/utils/secrets/.env` is ignored by git and should contain local secrets only.
 - `backend/utils/secrets/.env.example` is the shareable template.
-- `POST /upload-transactions` parses, normalizes, validates, and persists valid transactions.
-- The remaining API/service methods currently return TODO responses or raise TODO implementation placeholders.
+- `POST /upload-transactions` parses CSV/XLSX files, normalizes and validates transactions, applies FIFO in chronological order, persists transactions, stores refreshed current positions, and returns only an upload summary.
+- `GET /clients` lists distinct client IDs from transaction data.
+- `GET /clients/{client_id}/positions` reads stored positions per ISIN with realized and unrealized P&L.
+- The remaining violations and analytics API/service methods currently return TODO responses or raise TODO implementation placeholders.
 - Database tables are created directly from SQLAlchemy metadata.

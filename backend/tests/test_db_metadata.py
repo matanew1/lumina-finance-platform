@@ -18,3 +18,15 @@ def test_transactions_columns_match_sample_workbook_shape() -> None:
     assert "quantity" in columns
     assert "price" in columns
     assert "timestamp" in columns
+
+
+def test_positions_columns_store_upload_time_fifo_results() -> None:
+    columns = Base.metadata.tables["positions"].columns
+
+    assert "client_id" in columns
+    assert "isin" in columns
+    assert "quantity" in columns
+    assert "average_price" in columns
+    assert "market_price" in columns
+    assert "realized_pnl" in columns
+    assert "unrealized_pnl" in columns

@@ -20,6 +20,9 @@ class Position(Base):
     isin: Mapped[str] = mapped_column(String(12), index=True, nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     average_price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    market_price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         server_default=func.now(),
