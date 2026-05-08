@@ -4,6 +4,13 @@ import pandas as pd
 from fastapi import UploadFile
 
 
+
+def has_allowed_extension(filename: str | None, allowed_extensions: tuple[str, ...]) -> bool:
+    if not filename:
+        return False
+    return filename.lower().endswith(tuple(extension.lower() for extension in allowed_extensions))
+
+
 async def read_upload_bytes(
     file: UploadFile,
     *, # pylint: disable=unused-argument
@@ -46,9 +53,3 @@ async def read_excel_upload(
         raise ValueError(empty_dataframe_message)
 
     return dataframe
-
-
-def has_allowed_extension(filename: str | None, allowed_extensions: tuple[str, ...]) -> bool:
-    if not filename:
-        return False
-    return filename.lower().endswith(tuple(extension.lower() for extension in allowed_extensions))

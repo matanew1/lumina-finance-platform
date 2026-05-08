@@ -34,6 +34,7 @@ class TransactionService:
                 "transactions": [],
             }
 
+        # Convert valid rows to Transaction records and persist to the database
         records = transaction_records_from_dataframe(normalized)
         self.transaction_repository.bulk_create(records)
 
