@@ -23,14 +23,17 @@ class DayTradingRule:
         drafts: list[ViolationDraft] = []
         for isin, transactions in transactions_by_isin.items():
             max_pairs = self._max_pairs_in_window(transactions)
-            if max_pairs > self.PAIR_THRESHOLD:
+            if max_pairs >= self.PAIR_THRESHOLD:
                 drafts.append(
                     ViolationDraft(
                         client_id=ctx.client_id,
                         transaction_id=transactions[-1].transaction_id,
                         violation_type=ViolationType.DAY_TRADING,
                         severity=ViolationSeverity.WARNING,
-                        message=f"{max_pairs} buy/sell pairs of {isin} within 24h (limit: {self.PAIR_THRESHOLD}).",
+                        message=(
+                            f"{max_pairs} buy/sell pairs of {isin} within 24h "
+                            f"(threshold: {self.PAIR_THRESHOLD})."
+                        ),
                     )
                 )
         return drafts
@@ -41,7 +44,7 @@ class DayTradingRule:
 
         for transaction in transactions:
 
-            # Remove expired transactions from the window 
+            # Remove expired transactions from the window
             while window and transaction.timestamp - window[0].timestamp > self.WINDOW:
                 expired = window.popleft()
                 if expired.action == "buy":

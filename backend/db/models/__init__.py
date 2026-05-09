@@ -1,5 +1,5 @@
-from backend.db.models.position import Position
-from backend.db.models.transaction import Transaction
-from backend.db.models.violation import Violation
+from backend.db.models.positions.model import Position
+from backend.db.models.transactions.model import Transaction
+from backend.db.models.violations.model import Violation
 
 __all__ = ["Position", "Transaction", "Violation"]

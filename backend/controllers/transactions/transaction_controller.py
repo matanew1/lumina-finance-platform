@@ -1,31 +1,28 @@
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 
-from backend.db.session import get_db
-from backend.schemas.transaction_schema import TransactionUploadResponse
+from backend.db.database import get_db
+from backend.db.repositories.positions.repository import PositionRepository
+from backend.db.repositories.transactions.repository import TransactionRepository
+from backend.db.repositories.violations.repository import ViolationRepository
+from backend.schemas.transactions.schema import TransactionUploadResponse
+from backend.services.positions.position_service import PositionService
 from backend.services.transactions.transaction_service import TransactionService
-from backend.utils.exceptions import ConflictError, PersistenceError, BadRequestError
+from backend.services.violations.violation_service import ViolationService
+from backend.utils.errors.exceptions import BadRequestError, ConflictError, PersistenceError
 
 router = APIRouter(tags=["transactions"])
 
 
-class TransactionController:
-    def __init__(self, db: Session) -> None:
-        self.service = TransactionService(db=db)
-
-    async def upload_transactions(self, file: UploadFile):
-        try:
-            return await self.service.upload_transactions(file=file)
-        except ConflictError as exc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        except BadRequestError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        except PersistenceError as exc:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
-
-
-def get_transaction_controller(db: Session = Depends(get_db)) -> TransactionController:
-    return TransactionController(db=db)
+def get_transaction_service(db: Session = Depends(get_db)) -> TransactionService:
+    position_service = PositionService(position_repository=PositionRepository(db))
+    violation_service = ViolationService(violation_repository=ViolationRepository(db))
+    return TransactionService(
+        transaction_repository=TransactionRepository(db),
+        position_service=position_service,
+        violation_service=violation_service,
+        db=db,
+    )
 
 
 @router.post(
@@ -35,6 +32,13 @@ def get_transaction_controller(db: Session = Depends(get_db)) -> TransactionCont
 )
 async def upload_transactions(
     file: UploadFile = File(...),
-    controller: TransactionController = Depends(get_transaction_controller),
+    service: TransactionService = Depends(get_transaction_service),
 ):
-    return await controller.upload_transactions(file)
+    try:
+        return await service.upload_transactions(file=file)
+    except ConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except BadRequestError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PersistenceError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc

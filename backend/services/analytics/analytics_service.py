@@ -1,41 +1,29 @@
-from collections.abc import Sequence
-
-from sqlalchemy.orm import Session
-
-from backend.db.repositories.analytics_repository import AnalyticsRepository
-from backend.services.analytics.calculators import (
-    AnalyticsCalculator,
-    AverageHoldingTimeCalculator,
-    IsinConcentrationCalculator,
-    MostVolatileClientCalculator,
-    TopTradedIsinsCalculator,
-)
+from backend.db.repositories.analytics.repository import AnalyticsRepository
+from backend.services.analytics.reports import AnalyticsReports
+from backend.services.analytics.types import AnalyticsResponse
 
 
 class AnalyticsService:
     def __init__(
         self,
-        db: Session,
-        analytics_repository: AnalyticsRepository | None = None,
-        calculators: Sequence[AnalyticsCalculator] | None = None,
+        analytics_repository: AnalyticsRepository,
+        reports: AnalyticsReports | None = None,
     ) -> None:
-        self.analytics_repository = analytics_repository or AnalyticsRepository(db)
-        self.calculators = list(calculators or self._default_calculators())
+        self.analytics_repository = analytics_repository
+        self.reports = reports or AnalyticsReports()
 
-    def get_analytics(self) -> dict:
+    def get_analytics(self) -> AnalyticsResponse:
         transactions = self.analytics_repository.list_transactions_ordered()
         positions = self.analytics_repository.list_current_positions()
 
         return {
-            calculator.report_name: calculator.calculate(transactions, positions)
-            for calculator in self.calculators
+            "top_traded_isins": self.reports.top_traded_isins(transactions),
+            "average_holding_time_per_client": self.reports.average_holding_time_per_client(
+                transactions
+            ),
+            "most_volatile_client": self.reports.most_volatile_client(transactions),
+            "isin_concentration_report": self.reports.isin_concentration_report(
+                transactions,
+                positions,
+            ),
         }
-
-    @staticmethod
-    def _default_calculators() -> list[AnalyticsCalculator]:
-        return [
-            TopTradedIsinsCalculator(),
-            AverageHoldingTimeCalculator(),
-            MostVolatileClientCalculator(),
-            IsinConcentrationCalculator(),
-        ]

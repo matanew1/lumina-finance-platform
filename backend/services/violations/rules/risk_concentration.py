@@ -31,18 +31,20 @@ class RiskConcentrationRule:
 
         drafts: list[ViolationDraft] = []
         for position, value in market_values:
-            # If the position's market value exceeds the threshold percentage of the total market value, create a violation draft.
             if value > self.THRESHOLD * total_market_value:
-
-                # Calculate the percentage share of this position in the portfolio for the violation message.
-                share_pct = (value / total_market_value * Decimal("100")).quantize(Decimal("0.01"))
+                share_pct = (value / total_market_value * Decimal("100")).quantize(
+                    Decimal("0.01")
+                )
                 drafts.append(
                     ViolationDraft(
                         client_id=ctx.client_id,
                         transaction_id=position.transaction_id,
                         violation_type=ViolationType.RISK_CONCENTRATION,
                         severity=ViolationSeverity.WARNING,
-                        message=f"{position.isin} is {share_pct}% of portfolio (threshold: 50%).",
+                        message=(
+                            f"{position.isin} is {share_pct}% of portfolio "
+                            "(threshold: 50%)."
+                        ),
                     )
                 )
         return drafts

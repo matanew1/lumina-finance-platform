@@ -21,6 +21,8 @@ Only the main prompts are listed here.
 - Persist positions after transaction upload, then make `GET /clients/{client_id}/positions` read from the positions table.
 - Implement violations: invalid values, sell before buy, day trading, and risk concentration.
 - Implement Part F analytics through `GET /analytics`.
+- Refactor service modules into class-based helpers and move shared service data shapes into `types.py` files.
+- Reintroduce dataclasses in service `types.py` files where they make the business logic shorter and clearer.
 
 ---
 
@@ -50,9 +52,9 @@ Only the main prompts are listed here.
   - recalculates positions
   - generates violations
   - commits the processed data together
-- Violation engine and rule classes.
-- Analytics service and response schema.
-- Pytest test suite for ingestion, FIFO, positions, clients, violations, analytics, API contracts, and DB metadata.
+- Violation service and rule classes.
+- Analytics service, analytics report class, and response schema.
+- Pytest tests for transaction upload, transaction validation, FIFO, violations, and analytics behavior.
 - README setup instructions.
 
 ---
@@ -74,8 +76,11 @@ I treated the AI output as a starting point, then changed it to make the project
 - **FIFO performance:** replaced list-based front removal with `collections.deque`, improving oldest-lot consumption from potential `O(n^2)` behavior to `O(n)`.
 - **Violation responses:** added persisted violation lookup and structured response fields, including severity and related transaction IDs where available.
 - **Analytics:** replaced the TODO analytics endpoint with structured Part F analytics based on processed transactions and positions.
-- **Analytics modularity:** consolidated analytics calculations into focused calculator classes in one report-calculator module, so each report has one responsibility and `AnalyticsService` only orchestrates data loading and report assembly.
+- **Analytics modularity:** consolidated analytics calculations into an `AnalyticsReports` class, so each report has one method and `AnalyticsService` only orchestrates data loading and report assembly.
 - **Database setup:** kept PostgreSQL as the main Docker Compose setup while adding SQLite support through the SQLAlchemy connection string for easier local grading.
+- **Service typing:** added local `types.py` files for analytics, clients, positions, transactions, and violations so shared protocols, aliases, and dataclasses live beside the services that use them.
+- **Class-based service helpers:** converted standalone FIFO and analytics helper functions into `FifoCalculator` and `AnalyticsReports` classes.
+- **Dataclass cleanup:** restored dataclasses for compact service state and draft objects such as `TransactionIngestionResult`, `PositionState`, `HoldingLot`, `ClientContext`, `PositionSnapshot`, and `ViolationDraft`.
 
 ---
 
@@ -119,6 +124,9 @@ These are only the issues that were caught through manual review/user feedback d
 - **FIFO lot consumption needed better performance.**  
   Fixed after user feedback by replacing list front-removal with `collections.deque`, improving the FIFO algorithm from potential `O(n^2)` behavior to `O(n)`.
 
+- **The first simplification pass overused plain dictionaries.**  
+  Fixed after user feedback by bringing back dataclasses in service `types.py` files where attribute access made the code shorter and easier to follow.
+
 - **Risk concentration violations returned `transaction_id: null`.**  
   Fixed by attaching the latest transaction ID for the affected client/ISIN.
 
@@ -142,13 +150,11 @@ These are only the issues that were caught through manual review/user feedback d
 Final validation commands:
 
 ```bash
-python3 -m compileall backend
-.venv/bin/python -m pytest backend/tests
+.venv/bin/pytest backend/tests
 ```
 
 Final result:
 
-- Backend compile check passed.
-- Full backend test suite passed: `35 passed`.
+- Current backend test suite passed: `5 passed`.
 - FIFO calculation results were also checked manually against the Excel sample to make sure the AI-generated logic did not invent or distort the expected calculations.
 - SQLite fallback configuration was covered by tests for the SQLAlchemy engine settings.

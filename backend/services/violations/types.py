@@ -36,7 +36,7 @@ class PositionView(Protocol):
     transaction_id: Optional[str]
 
 
-@dataclass(frozen=True) # frozen to ensure immutability of violation drafts
+@dataclass(frozen=True)
 class PositionSnapshot:
     client_id: str
     isin: str
@@ -45,7 +45,7 @@ class PositionSnapshot:
     transaction_id: Optional[str] = None
 
 
-@dataclass(frozen=True) # frozen to ensure immutability of violation drafts
+@dataclass(frozen=True)
 class ViolationDraft:
     client_id: str
     violation_type: str
@@ -58,4 +58,4 @@ class ViolationDraft:
 class ClientContext:
     client_id: str
     transactions: list[TransactionView] = field(default_factory=list)
-    positions: list[PositionView] = field(default_factory=list)
+    positions: list[PositionSnapshot] = field(default_factory=list)

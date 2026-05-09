@@ -1,113 +1,76 @@
-from __future__ import annotations
+from collections.abc import Iterable
 
-from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime
-from decimal import Decimal
-from typing import Iterable, Protocol
+from backend.services.positions.types import (
+    OpenLot,
+    PositionKey,
+    PositionResult,
+    PositionState,
+    TransactionView,
+)
 
 '''
-Unrealized: What you could make if you sold right now.
-Realized: What you actually made from the sale you already finished.
+Description:
+Realized P&L = (Sell Price - Buy Price) * Quantity Sold
+Unrealized P&L = (Current Market Price - Average Cost) * Quantity Held
+
+FIFO Logic:
+1. When a buy transaction occurs, we add the quantity and price to a queue (representing the lots).
+2. When a sell transaction occurs, we consume from the queue starting with the oldest lot until the sell quantity is fulfilled. 
+3. For each consumed lot, we calculate the realized P&L based on the difference between the sell price and the buy price of that lot.
+4. After processing all transactions, we calculate the average cost and unrealized P&L for the remaining quantity in the queue.
 '''
 
-
-class TransactionLike(Protocol):
-    transaction_id: str
-    client_id: str
-    isin: str
-    action: str
-    quantity: Decimal
-    price: Decimal
-    timestamp: datetime
+TIMESTAMP_SORT_FUNC = lambda item: (item.timestamp, getattr(item, "id", 0), item.transaction_id)
 
 
-@dataclass
-class OpenLot:
-    quantity: Decimal
-    unit_cost: Decimal
+class FifoCalculator:
+    def calculate(self, transactions: Iterable[TransactionView]) -> list[PositionResult]:
+        positions: dict[PositionKey, PositionState] = {}
 
+        for transaction in sorted(transactions, key=TIMESTAMP_SORT_FUNC):
+            position = self._position_for_transaction(positions, transaction)
+            position.market_price = transaction.price
 
-@dataclass
-class PositionState:
-    client_id: str
-    isin: str
-    open_lots: deque[OpenLot] = field(default_factory=deque)
-    realized_pnl: Decimal = Decimal("0")
-    market_price: Decimal = Decimal("0")
+            if transaction.action == "buy":
+                position.open_lots.append(
+                    OpenLot(quantity=transaction.quantity, unit_cost=transaction.price)
+                )
+            elif transaction.action == "sell":
+                self._apply_sell(transaction, position)
+            else:
+                raise ValueError(f"Unsupported transaction action: {transaction.action}.")
 
-    @property
-    def quantity(self) -> Decimal:
-        return sum((lot.quantity for lot in self.open_lots), Decimal("0"))
+        return [position.as_dict() for position in positions.values()]
 
-    @property
-    def average_cost(self) -> Decimal:
-        if self.quantity == 0:
-            return Decimal("0")
-        total_cost = sum((lot.quantity * lot.unit_cost for lot in self.open_lots), Decimal("0"))
-        return total_cost / self.quantity
+    def _position_for_transaction(
+        self,
+        positions: dict[PositionKey, PositionState],
+        transaction: TransactionView,
+    ) -> PositionState:
+        key = (transaction.client_id, transaction.isin)
+        return positions.setdefault(
+            key,
+            PositionState(client_id=transaction.client_id, isin=transaction.isin),
+        )
 
-    @property
-    def unrealized_pnl(self) -> Decimal:
-        return self.quantity * (self.market_price - self.average_cost)
-
-    def apply_buy(self, transaction: TransactionLike) -> None:
-        self.open_lots.append(OpenLot(quantity=transaction.quantity, unit_cost=transaction.price))
-
-    def apply_sell(self, transaction: TransactionLike) -> None:
+    def _apply_sell(self, transaction: TransactionView, position: PositionState) -> None:
         remaining = transaction.quantity
-        while remaining > 0 and self.open_lots:
-            oldest = self.open_lots[0] # oldest lot is at the front of the deque
-            consumed = min(oldest.quantity, remaining) # quantity consumed from this lot for the sell transaction
-            self.realized_pnl += consumed * (transaction.price - oldest.unit_cost) # PnL realized from consuming this lot
-            oldest.quantity -= consumed # reduce the quantity in the oldest lot by the consumed amount
-            remaining -= consumed # reduce the remaining quantity to sell by the consumed amount
-            if oldest.quantity == 0: # if the oldest lot has been fully consumed, remove it from the deque
-                self.open_lots.popleft()
+        lots = position.open_lots
+
+        while remaining > 0 and lots:
+            oldest_lot = lots[0]
+            consumed = min(oldest_lot.quantity, remaining)
+            position.realized_pnl += consumed * (transaction.price - oldest_lot.unit_cost)
+            oldest_lot.quantity -= consumed
+            remaining -= consumed
+
+            if oldest_lot.quantity == 0:
+                lots.popleft()
 
         if remaining > 0:
             raise ValueError(
                 f"Sell transaction {transaction.transaction_id} exceeds available position for {transaction.isin}."
             )
 
-    def as_dict(self) -> dict:
-        return {
-            "client_id": self.client_id,
-            "isin": self.isin,
-            "quantity": self.quantity,
-            "average_cost": self.average_cost,
-            "market_price": self.market_price,
-            "realized_pnl": self.realized_pnl,
-            "unrealized_pnl": self.unrealized_pnl,
-        }
 
-
-def calculate_fifo_positions(transactions: Iterable[TransactionLike]) -> list[dict]:
-    positions: dict[tuple[str, str], PositionState] = {}
-
-    # Same-timestamp ties broken by DB id then transaction_id so FIFO ordering is deterministic.
-    chronological_transactions = sorted(
-        transactions,
-        key=lambda transaction: (
-            transaction.timestamp,
-            getattr(transaction, "id", 0),
-            transaction.transaction_id,
-        ),
-    )
-
-    for transaction in chronological_transactions:
-        key = (transaction.client_id, transaction.isin)
-        state = positions.setdefault(
-            key,
-            PositionState(client_id=transaction.client_id, isin=transaction.isin),
-        )
-        state.market_price = transaction.price
-
-        if transaction.action == "buy":
-            state.apply_buy(transaction)
-        elif transaction.action == "sell":
-            state.apply_sell(transaction)
-        else:
-            raise ValueError(f"Unsupported transaction action: {transaction.action}.")
-
-    return [state.as_dict() for state in positions.values()]
+calculate_fifo_positions = FifoCalculator().calculate

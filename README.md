@@ -15,15 +15,20 @@ Transaction upload ingestion, validation, client listing, FIFO position calculat
 
 ```text
 backend/
-  db/              database engine, sessions, initialization helpers
-    models/        SQLAlchemy models
-    repositories/  database access layer
+  db/
+    database.py    singleton database service, sessions, and init helpers
+    models/        domain-grouped SQLAlchemy models
+    repositories/  domain-grouped database access layer
   controllers/     feature-based FastAPI controller packages
   samples/         sample input files
   schemas/         Pydantic request/response schemas
   services/        feature-based business service packages
   tests/           backend tests
-  utils/           shared utilities, local secrets, and sample files
+  utils/
+    config/        app settings
+    errors/        app exceptions and DB error helpers
+    transactions/  transaction upload parsing and validation helpers
+    secrets/       local environment files
 frontend/
   src/             React UI skeleton
 docker-compose.yml
@@ -90,13 +95,9 @@ This creates a local `lumina_finance.db` file in the project root when tables ar
 
 ### Initialize Tables
 
-Initialize the database tables for either PostgreSQL or SQLite:
+The backend initializes tables automatically on startup by default. Set `AUTO_INIT_DB=false` in `backend/utils/secrets/.env` if you want to disable that.
 
-```bash
-python -m backend.db.init_db
-```
-
-This creates:
+Startup creates:
 
 - `transactions`
 - `positions`
