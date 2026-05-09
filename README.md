@@ -1,128 +1,129 @@
 # Lumina Finance Platform
 
-A finance platform skeleton with a FastAPI backend, SQLAlchemy models, PostgreSQL/SQLite database support, Swagger UI, and a simple React frontend.
+Mini full-stack financial transactions platform for Lumina Capital. The app
+uploads transaction files, validates them, stores processed data, calculates
+FIFO positions and P&L, detects rule violations, exposes analytics, and shows
+the results in a React UI.
 
-Transaction upload ingestion, validation, client listing, FIFO position calculation, violation detection, and analytics are implemented.
-
-## Tech Stack
+## Stack
 
 - Backend: Python, FastAPI, SQLAlchemy, pandas
-- Database: PostgreSQL with Docker Compose; SQLite is also supported by changing `DATABASE_URL`
+- Database: PostgreSQL with Docker Compose, or SQLite for simple local runs
 - Frontend: React with Vite
-- API docs: Swagger UI through FastAPI
+- Tests: pytest
 
 ## Project Structure
 
 ```text
 backend/
-  db/              database engine, sessions, initialization helpers
-    models/        SQLAlchemy models
-    repositories/  database access layer
-  controllers/     feature-based FastAPI controller packages
-  samples/         sample input files
-  schemas/         Pydantic request/response schemas
-  services/        feature-based business service packages
-  tests/           backend tests
-  utils/           shared utilities, local secrets, and sample files
+  app/
+    main.py                  FastAPI app factory
+    api/routes/              upload, clients, positions, violations, analytics
+    api/schemas/             API response models by domain
+    db/                      SQLAlchemy base, engine, sessions, schema init
+    models/                  transaction, position, violation ORM models
+    repositories/            database access layer
+    services/
+      shared/                CSV parsing, dataframe utilities, Decimal helpers, FIFO math
+      transactions/          upload orchestration, DTOs, ingestion helpers
+      clients/               client listing use case
+      positions/             client position responses and position snapshots
+      analytics/             analytics orchestration and calculations
+      violations/            violation orchestration and detector rules
+    utils/                   config, logging, app exceptions
+  tests/
+    helpers/                 API fixtures and mock row factories
+    test_api.py
+    test_logic.py
+  Dockerfile
+  requirements.txt
+data/
+  transactions_sample.xlsx
 frontend/
-  src/             React UI skeleton
+  src/
+    App.jsx
+    services/api.js
+  Dockerfile
 docker-compose.yml
 requirements.txt
 ```
 
-## Prerequisites
+## Flow 1: Docker Compose
 
-- Python 3.11+
-- Node.js 20+
-- Docker Desktop or Docker Engine, only if using PostgreSQL instead of SQLite
+Use this path when you want the full app with one command. It starts:
 
-## 1. Backend Environment
+- PostgreSQL on `localhost:5432`
+- FastAPI on `http://localhost:8000`
+- React/Vite on `http://localhost:5173`
 
-From the project root:
+```bash
+docker compose up --build
+```
+
+Then open:
+
+- Frontend: `http://localhost:5173`
+- API docs: `http://localhost:8000/docs`
+
+The backend container uses PostgreSQL through the internal Compose hostname
+`postgres`:
+
+```text
+postgresql+psycopg://postgres:postgres@postgres:5432/lumina_finance
+```
+
+Stop the app:
+
+```bash
+docker compose down
+```
+
+Stop the app and delete the PostgreSQL volume:
+
+```bash
+docker compose down -v
+```
+
+## Flow 2: Manual Local Setup
+
+Use this path when you want to run backend and frontend directly on your
+machine.
+
+### Backend
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+cp backend/.env.example backend/.env
 ```
 
-Create the local backend environment file:
-
-```bash
-cp backend/utils/secrets/.env.example backend/utils/secrets/.env
-```
-
-Default PostgreSQL database URL:
+For SQLite without Docker, set this in `backend/.env`:
 
 ```text
-postgresql+psycopg://postgres:postgres@localhost:5432/lumina_finance
+DATABASE_URL=sqlite:///./backend/lumina.db
 ```
 
-SQLite fallback URL, if you want to run without Docker:
+Backend settings are loaded from environment variables or `backend/.env`.
+All keys shown in `backend/.env.example` are required; the app does not rely on
+hardcoded runtime defaults for database URL, CORS, logging, or app settings.
 
-```text
-sqlite:///./lumina_finance.db
-```
-
-## 2. Choose And Initialize The Database
-
-### Option A: PostgreSQL With Docker Compose
+For PostgreSQL, keep the default `backend/.env.example` database URL and start
+Postgres:
 
 ```bash
 docker compose up -d postgres
 ```
 
-Check that the container is running:
+Run the backend:
 
 ```bash
-docker compose ps
+uvicorn backend.app.main:app --reload
 ```
 
-### Option B: SQLite Without Docker
+API docs: `http://localhost:8000/docs`
 
-Change `DATABASE_URL` in `backend/utils/secrets/.env` to:
-
-```text
-sqlite:///./lumina_finance.db
-```
-
-This creates a local `lumina_finance.db` file in the project root when tables are initialized.
-
-### Initialize Tables
-
-Initialize the database tables for either PostgreSQL or SQLite:
-
-```bash
-python -m backend.db.init_db
-```
-
-This creates:
-
-- `transactions`
-- `positions`
-- `violations`
-
-## 3. Run Backend API
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-Backend URLs:
-
-- API root: `http://127.0.0.1:8000`
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
-
-Registered endpoints:
-
-- `POST /upload-transactions`
-- `GET /clients`
-- `GET /clients/{client_id}/positions`
-- `GET /violations`
-- `GET /analytics`
-
-## 4. Run Frontend
+### Frontend
 
 In a second terminal:
 
@@ -132,21 +133,28 @@ npm install
 npm run dev
 ```
 
-Frontend URL:
+Open `http://localhost:5173`.
+
+The frontend defaults to `http://localhost:8000` for the backend API. Override it
+with `VITE_API_BASE_URL` if needed.
+
+## API
+
+- `POST /upload-transactions`
+- `GET /clients`
+- `GET /clients/{client_id}/positions`
+- `GET /violations`
+- `GET /analytics`
+
+## Input File
+
+Sample workbook:
 
 ```text
-http://127.0.0.1:5173
+data/transactions_sample.xlsx
 ```
 
-## 5. Sample Data
-
-The sample workbook is stored at:
-
-```text
-backend/utils/samples/transactions_sample.xlsx
-```
-
-Uploads support `.xlsx` and `.csv` files with these transaction columns:
+Required columns:
 
 - `ClientId`
 - `TransactionId`
@@ -156,50 +164,24 @@ Uploads support `.xlsx` and `.csv` files with these transaction columns:
 - `Price`
 - `Timestamp`
 
-## 6. Tests And Verification
+Rules:
 
-Run backend tests:
+- `Quantity > 0`
+- `Price > 0`
+- `Action` is `Buy` or `Sell`
+
+## Tests
+
+Backend:
 
 ```bash
-source .venv/bin/activate
 python -m pytest backend/tests
-```
-
-Run backend syntax check:
-
-```bash
 python -m compileall backend
 ```
 
-Build frontend:
+Frontend:
 
 ```bash
 cd frontend
 npm run build
 ```
-
-## 7. Stop Services
-
-Stop PostgreSQL while keeping the database volume:
-
-```bash
-docker compose down
-```
-
-Stop PostgreSQL and delete local database data:
-
-```bash
-docker compose down -v
-```
-
-## Notes
-
-- `backend/utils/secrets/.env` is ignored by git and should contain local secrets only.
-- `backend/utils/secrets/.env.example` is the shareable template.
-- PostgreSQL is the recommended setup for this project, and SQLite can be used by changing only `DATABASE_URL`.
-- `POST /upload-transactions` parses CSV/XLSX files, normalizes and validates transactions, applies FIFO in chronological order, persists transactions, stores refreshed current positions, and returns only an upload summary.
-- `GET /clients` lists distinct client IDs from transaction data.
-- `GET /clients/{client_id}/positions` reads stored positions per ISIN with realized and unrealized P&L.
-- `GET /violations` reads persisted compliance violations.
-- `GET /analytics` returns top traded ISINs, client holding-time averages, the most volatile client, and ISIN concentration reports.
-- Database tables are created directly from SQLAlchemy metadata.
