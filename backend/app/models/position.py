@@ -37,3 +37,7 @@ class Position(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    @property
+    def average_cost(self) -> Decimal:
+        return self.average_price

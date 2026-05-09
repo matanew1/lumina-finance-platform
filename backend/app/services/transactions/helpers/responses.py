@@ -1,5 +1,5 @@
-from backend.app.api.schemas.transactions import TransactionUploadResponse
-from backend.app.services.transactions.schemas import TransactionIngestionResult
+from backend.app.schemas.transactions import TransactionUploadResponse
+from backend.app.schemas.transactions import TransactionIngestionResult
 
 
 def failure_response(result: TransactionIngestionResult) -> TransactionUploadResponse:

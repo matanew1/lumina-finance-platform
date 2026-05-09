@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pandas as pd
 
-from backend.app.services.shared.math_utils import calculate_fifo_positions
+from backend.app.services.positions.helpers.fifo_engine import calculate_fifo_positions
 from backend.app.services.violations import (
     ClientContext,
     ViolationType,

@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from backend.app.services.positions.schemas import (
+from backend.app.schemas.positions import (
     PositionSnapshot,
     PositionView,
     TransactionView,

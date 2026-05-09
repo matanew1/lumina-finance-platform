@@ -1,1 +1,0 @@
-"""Core FastAPI application package."""

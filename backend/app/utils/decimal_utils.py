@@ -1,8 +1,4 @@
-from decimal import Decimal
-
-ZERO = Decimal("0")
-CENT = Decimal("0.01")
-PERCENT = Decimal("100")
+from backend.app.utils.constants import CENT, PERCENT, ZERO
 
 
 def percentage(part: Decimal, whole: Decimal) -> Decimal:

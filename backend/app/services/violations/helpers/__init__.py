@@ -1,1 +1,0 @@
-"""Violation helper functions."""

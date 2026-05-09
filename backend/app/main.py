@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.exception_handlers import register_exception_handlers
+from backend.app.utils.exception_handlers import register_exception_handlers
 from backend.app.api.routes import router as api_router
 from backend.app.utils.config import configure_logging, settings
 from backend.app.db.session import init_schema

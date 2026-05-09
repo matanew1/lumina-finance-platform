@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
 from backend.app.repositories.violations import ViolationRepository
-from backend.app.api.schemas.violations import ViolationResponse
+from backend.app.schemas.violations import ViolationResponse
 from backend.app.services.violations import list_violations as list_violations_use_case
 
 router = APIRouter(tags=["violations"])

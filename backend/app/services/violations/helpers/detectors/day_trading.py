@@ -1,65 +1,69 @@
 from collections import defaultdict, deque
 from datetime import timedelta
 
-from backend.app.services.violations.schemas import (
+from backend.app.schemas.violations import (
     ClientContext,
     TransactionView,
     ViolationDraft,
-    ViolationRule,
     ViolationSeverity,
     ViolationType,
 )
-
-
-class DayTradingRule(ViolationRule):
-    def evaluate(self, ctx: ClientContext) -> list[ViolationDraft]:
-        pair_threshold = 3
-        transactions_by_isin: dict[str, list[TransactionView]] = defaultdict(list)
-        for transaction in ctx.transactions:
-            transactions_by_isin[transaction.isin].append(transaction)
-
-        drafts: list[ViolationDraft] = []
-        for isin, transactions in transactions_by_isin.items():
-            max_pairs = _max_pairs_in_window(transactions)
-            if max_pairs >= pair_threshold:
-                drafts.append(
-                    ViolationDraft(
-                        client_id=ctx.client_id,
-                        transaction_id=transactions[-1].transaction_id,
-                        violation_type=ViolationType.DAY_TRADING,
-                        severity=ViolationSeverity.WARNING,
-                        message=(
-                            f"{max_pairs} buy/sell pairs of {isin} within 24h "
-                            f"(threshold: {pair_threshold})."
-                        ),
-                    )
-                )
-        return drafts
+from backend.app.utils.constants import DAY_TRADING_PAIR_THRESHOLD, DAY_TRADING_WINDOW
 
 
 def detect_day_trading(ctx: ClientContext) -> list[ViolationDraft]:
-    return DayTradingRule().evaluate(ctx)
+    """More than 3 buy/sell pairs within 24 hours -> flag as Day Trading"""
+    # Group transactions by ISIN
+    transactions_by_isin: dict[str, list[TransactionView]] = defaultdict(list)
+    for t in ctx.transactions:
+        transactions_by_isin[t.isin].append(t)
+
+    # For each ISIN, check if it has any violations 
+    return [
+        ViolationDraft(
+            client_id=ctx.client_id,
+            transaction_id=txns[-1].transaction_id,
+            violation_type=ViolationType.DAY_TRADING,
+            severity=ViolationSeverity.WARNING,
+            message=f"{pairs} buy/sell pairs of {isin} within 24h (threshold: >{DAY_TRADING_PAIR_THRESHOLD}).",
+        )
+        for isin, txns in transactions_by_isin.items()
+        if (pairs := _max_pairs_in_window(txns)) > DAY_TRADING_PAIR_THRESHOLD
+    ]
 
 
 def _max_pairs_in_window(transactions: list[TransactionView]) -> int:
-    window: deque[TransactionView] = deque()
-    buys = sells = max_pairs = 0
-    period = timedelta(hours=24)
+    """
+    Sliding-window count of matched buy/sell pairs within 24 hours.
 
-    for transaction in transactions:
-        while window and transaction.timestamp - window[0].timestamp > period:
-            expired = window.popleft()
-            if expired.action == "buy":
-                buys -= 1
-            else:
-                sells -= 1
+    Logic:
+    - Two deques hold the timestamps of buys and sells currently inside the window.
+    - When the oldest entry falls outside the 24-hour boundary it is popped.
+    - A 'pair' is one buy + one sell — so min(len(buys), len(sells)) is the number of matched pairs at any point in time.
+    """
+    buys: deque = deque()   # timestamps of buys inside the window
+    sells: deque = deque()  # timestamps of sells inside the window
+    max_pairs = 0
 
-        window.append(transaction)
+    # Iterate over each transaction, sorted by timestamp
+    for transaction in transactions:  # pre-sorted by timestamp in detect_violations
+        cutoff = transaction.timestamp - DAY_TRADING_WINDOW
+        
+        # Remove buys that are not in the last 24 hours
+        while buys and buys[0] < cutoff:
+            buys.popleft()
+            
+        # Remove sells that are not in the last 24 hours
+        while sells and sells[0] < cutoff:
+            sells.popleft()
+
+        # Add the current transaction to the appropriate deque
         if transaction.action == "buy":
-            buys += 1
+            buys.append(transaction.timestamp)
         else:
-            sells += 1
-
-        max_pairs = max(max_pairs, min(buys, sells))
+            sells.append(transaction.timestamp) 
+            
+        # Update the maximum number of pairs
+        max_pairs = max(max_pairs, min(len(buys), len(sells)))
 
     return max_pairs

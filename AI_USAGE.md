@@ -24,6 +24,10 @@ These prompts show the main development flow.
 - Review the code structure against SRP and clean up files with too many responsibilities.
 - Update Docker Compose so the full app can start at once, and document both Docker and manual setup flows.
 - Make backend settings come from environment variables or `backend/.env` instead of hidden runtime defaults.
+- Deduplicate repeated `TransactionView` and `PositionView` Protocol definitions across service schema files by moving them into a shared protocols module.
+- Consolidate analytics service result models and API response schemas into a single source of truth to eliminate duplicated class bodies.
+- Replace the `ViolationRule` ABC and its `evaluate`/`__call__` indirection with a plain `Callable` type alias so rules are just functions.
+- Improve the day-trading sliding-window algorithm by using two separate timestamp deques instead of a single full-object deque with manual integer counters.
 
 ## What Code Was Generated
 
@@ -65,6 +69,11 @@ These prompts show the main development flow.
 - Added Dockerfiles for backend and frontend and expanded Compose from database-only to full-stack startup.
 - Updated backend config so required settings are injected from environment variables or `backend/.env`.
 - Updated README and sample-data paths to match the final structure.
+- Created `services/shared/protocols.py` as the single home for `TransactionView` and `PositionView` Protocols; deleted the three duplicate definitions that existed across the analytics, positions, and violations schema files.
+- Merged analytics service result models with API response schemas by renaming the `*Result` variants to match the API names and adding `from_attributes=True`; made `api/schemas/analytics.py` a four-line re-export shim.
+- Fixed the resulting circular import by updating `analytics_service.py` to import `AnalyticsResponse` from the service layer instead of the API layer, and removed the redundant `model_validate` round-trip.
+- Replaced the `ViolationRule` ABC, `ViolationRule.evaluate`, and the `__call__` forwarding method with a `Callable` type alias; converted all four rule classes into plain `detect_*` functions.
+- Rewrote the day-trading sliding window to use two separate timestamp-only deques (`buys`, `sells`) so `len()` replaces manual integer counters and the branched decrement pattern is removed.
 
 ## Mistakes And How I Fixed Them
 
@@ -84,7 +93,7 @@ These prompts show the main development flow.
   I replaced list front-removal with `collections.deque` and `popleft()`, improving repeated lot consumption from potential `O(n^2)` behavior toward `O(n)`.
 
 - **FIFO state names were unclear.**  
-  I clarified the model with names such as `OpenLot`, `PositionState`, and `PositionCalculation`.
+  I clarified the model with names such as `OpenLot`, `PositionState`, and `PositionSchema`.
 
 - **API tests became too heavy.**  
   I moved fake sessions, mock rows, and helper functions into `backend/tests/helpers`.
@@ -112,3 +121,10 @@ These prompts show the main development flow.
 
 - **The backend could silently fall back to hardcoded config defaults.**  
   I made settings required so deployment and local setup must provide values through Compose environment variables or `backend/.env`.
+
+- **Schema consolidation introduced a circular import.**  
+  When `api/schemas/analytics.py` was made to import from `services/analytics/schemas.py`, and `analytics_service.py` still imported from `api/schemas/analytics.py`, Python hit a circular initialisation. I fixed it by moving the `AnalyticsResponse` import in `analytics_service.py` directly to the service-layer schema, which is the canonical owner.
+
+- **The violations package `__init__.py` still exported the deleted Rule classes.**  
+  After the four `*Rule` classes were removed, `violations/__init__.py` tried to import `DayTradingRule`, `InvalidValuesRule`, etc., causing an `ImportError` at startup. I removed those stale names and updated `__all__` to export only the `detect_*` functions.
+

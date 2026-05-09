@@ -1,14 +1,10 @@
 from backend.app.services.violations.helpers.detectors import (
-    DayTradingRule,
-    InvalidValuesRule,
-    RiskConcentrationRule,
-    SellBeforeBuyRule,
     detect_day_trading,
     detect_invalid_values,
     detect_risk_concentration,
     detect_sell_before_buy,
 )
-from backend.app.services.violations.schemas import (
+from backend.app.schemas.violations import (
     ClientContext,
     TransactionView,
     ViolationDraft,
@@ -28,10 +24,6 @@ __all__ = [
     "BLOCKING_RULES",
     "DEFAULT_RULES",
     "ClientContext",
-    "DayTradingRule",
-    "InvalidValuesRule",
-    "RiskConcentrationRule",
-    "SellBeforeBuyRule",
     "TransactionView",
     "ViolationDraft",
     "ViolationRule",

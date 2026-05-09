@@ -9,6 +9,10 @@ from backend.app.services.violations import ViolationDraft
 
 
 class ViolationRepository(BaseRepository):
+    '''
+    Repository for managing Violation records in the database.
+    Provides methods to list violations and update violations for clients.
+    '''
     def list_violations(self, client_id: Optional[str] = None) -> list[Violation]:
         statement = select(Violation)
         if client_id is not None:

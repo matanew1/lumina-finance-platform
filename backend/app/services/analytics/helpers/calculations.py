@@ -1,37 +1,40 @@
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from backend.app.services.shared.decimal_utils import CENT, ZERO, percentage
-from backend.app.services.analytics.schemas import (
-    AnalyticsResult,
-    ClientAverageHoldingTimeResult,
+from backend.app.utils.constants import (
+    ANALYTICS_CONCENTRATION_THRESHOLD,
+    CENT,
+    SECONDS_PER_DAY,
+    TOP_TRADED_LIMIT,
+    ZERO,
+)
+from backend.app.utils.decimal_utils import percentage
+from backend.app.schemas.analytics import (
+    AnalyticsResponse,
+    ClientAverageHoldingTime,
     HoldingLot,
-    IsinConcentrationResult,
-    MostVolatileClientResult,
+    IsinConcentrationEntry,
+    MostVolatileClient,
     PositionView,
-    TopTradedIsinResult,
+    TopTradedIsin,
     TransactionView,
 )
-
-SECONDS_PER_DAY = Decimal("86400")
-CONCENTRATION_THRESHOLD = Decimal("70.00")
-TOP_TRADED_LIMIT = 3
 
 
 def calculate_top_traded_isins(
     transactions: list[TransactionView],
     limit: int = TOP_TRADED_LIMIT,
-) -> list[TopTradedIsinResult]:
+) -> list[TopTradedIsin]:
     counts = Counter(sorted(transaction.isin for transaction in transactions))
     return [
-        TopTradedIsinResult(isin=isin, transaction_count=transaction_count)
+        TopTradedIsin(isin=isin, transaction_count=transaction_count)
         for isin, transaction_count in counts.most_common(limit)
     ]
 
 
 def calculate_average_holding_time_per_client(
     transactions: list[TransactionView],
-) -> list[ClientAverageHoldingTimeResult]:
+) -> list[ClientAverageHoldingTime]:
     client_ids = sorted({transaction.client_id for transaction in transactions})
     open_holdings: dict[tuple[str, str], list[HoldingLot]] = defaultdict(list)
     weighted_seconds_by_client: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -75,8 +78,8 @@ def calculate_average_holding_time_per_client(
 
 def calculate_most_volatile_client(
     transactions: list[TransactionView],
-) -> MostVolatileClientResult | None:
-    most_volatile: MostVolatileClientResult | None = None
+) -> MostVolatileClient | None:
+    most_volatile: MostVolatileClient | None = None
     transactions_by_client: dict[str, list[TransactionView]] = defaultdict(list)
     for transaction in transactions:
         transactions_by_client[transaction.client_id].append(transaction)
@@ -91,7 +94,7 @@ def calculate_most_volatile_client(
         min_value = min(portfolio_values)
         max_value = max(portfolio_values)
         value_range = max_value - min_value
-        candidate = MostVolatileClientResult(
+        candidate = MostVolatileClient(
             client_id=client_id,
             min_portfolio_value=min_value,
             max_portfolio_value=max_value,
@@ -107,7 +110,7 @@ def calculate_most_volatile_client(
 def calculate_isin_concentration_report(
     transactions: list[TransactionView],
     positions: list[PositionView],
-) -> list[IsinConcentrationResult]:
+) -> list[IsinConcentrationEntry]:
     total_clients = len({transaction.client_id for transaction in transactions})
     if total_clients == 0:
         return []
@@ -117,13 +120,13 @@ def calculate_isin_concentration_report(
         if position.quantity > 0:
             clients_by_isin[position.isin].add(position.client_id)
 
-    report: list[IsinConcentrationResult] = []
+    report: list[IsinConcentrationEntry] = []
     for isin, holders in sorted(clients_by_isin.items()):
         clients = sorted(holders)
         client_percentage = percentage(Decimal(len(clients)), Decimal(total_clients))
-        if client_percentage > CONCENTRATION_THRESHOLD:
+        if client_percentage > ANALYTICS_CONCENTRATION_THRESHOLD:
             report.append(
-                IsinConcentrationResult(
+                IsinConcentrationEntry(
                     isin=isin,
                     client_count=len(clients),
                     client_percentage=client_percentage,
@@ -137,8 +140,8 @@ def calculate_isin_concentration_report(
 def calculate_analytics(
     transactions: list[TransactionView],
     positions: list[PositionView],
-) -> AnalyticsResult:
-    return AnalyticsResult(
+) -> AnalyticsResponse:
+    return AnalyticsResponse(
         top_traded_isins=ANALYTICS_CALCULATORS["top_traded_isins"](
             transactions,
             positions,
@@ -160,9 +163,9 @@ def _holding_time_result(
     client_id: str,
     weighted_seconds: Decimal,
     closed_quantity: Decimal,
-) -> ClientAverageHoldingTimeResult:
+) -> ClientAverageHoldingTime:
     average_seconds = ZERO if closed_quantity == 0 else weighted_seconds / closed_quantity
-    return ClientAverageHoldingTimeResult(
+    return ClientAverageHoldingTime(
         client_id=client_id,
         average_holding_seconds=average_seconds,
         average_holding_days=(average_seconds / SECONDS_PER_DAY).quantize(CENT),
