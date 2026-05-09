@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from backend.app.utils.constants import CENT, PERCENT, ZERO
 
 

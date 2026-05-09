@@ -11,6 +11,15 @@ def build_position_snapshots(
     transactions: list[TransactionView],
     positions: Iterable[PositionView],
 ) -> list[PositionSnapshot]:
+    """
+    Builds position snapshots for the given transactions and positions.
+    
+    - Parameters:
+        - transactions: list[TransactionView] - The transactions to process.
+        - positions: Iterable[PositionView] - The positions to process.
+    - Returns:
+        - list[PositionSnapshot] - The position snapshots.
+    """
     latest_transaction_ids = {
         (transaction.client_id, transaction.isin): transaction.transaction_id
         for transaction in transactions
@@ -29,6 +38,14 @@ def build_position_snapshots(
 
 
 def position_snapshot_from(position: PositionView) -> PositionSnapshot:
+    """
+    Creates a position snapshot from a position view.
+    
+    - Parameters:
+        - position: PositionView - The position view to convert.
+    - Returns:
+        - PositionSnapshot - The position snapshot.
+    """
     return PositionSnapshot(
         client_id=position.client_id,
         isin=position.isin,

@@ -3,17 +3,22 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pandas as pd
+import pytest
 
 from backend.app.services.positions.helpers.fifo_engine import calculate_fifo_positions
 from backend.app.services.violations import (
+    BLOCKING_RULES,
     ClientContext,
+    PERSISTED_RULES,
     ViolationType,
     detect_sell_before_buy,
+    validate_transactions_can_build_positions,
 )
 from backend.app.services.transactions.helpers.dataframe import (
     normalize_transaction_dataframe,
     validate_transaction_dataframe,
 )
+from backend.app.utils.exceptions import ValidationAppError
 
 
 @dataclass
@@ -82,6 +87,23 @@ def test_sell_before_buy_rule_flags_uncovered_sell() -> None:
 
     assert [draft.transaction_id for draft in drafts] == ["T1", "T3"]
     assert all(draft.violation_type == ViolationType.SELL_BEFORE_BUY for draft in drafts)
+
+
+def test_upload_position_validation_blocks_invalid_values() -> None:
+    with pytest.raises(ValidationAppError, match="Negative value"):
+        validate_transactions_can_build_positions(
+            [
+                tx("T1", "buy", "10", "-1"),
+            ]
+        )
+
+
+def test_persisted_rules_exclude_blocking_rules() -> None:
+    assert set(PERSISTED_RULES).isdisjoint(BLOCKING_RULES)
+    assert {rule.__name__ for rule in PERSISTED_RULES} == {
+        "detect_day_trading",
+        "detect_risk_concentration",
+    }
 
 
 def test_upload_validation_rejects_invalid_rows() -> None:

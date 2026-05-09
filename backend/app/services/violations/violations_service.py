@@ -17,7 +17,7 @@ from backend.app.schemas.violations import (
     ViolationRule,
     ViolationType,
 )
-from backend.app.utils.exceptions import InsufficientQuantityError
+from backend.app.utils.exceptions import InsufficientQuantityError, ValidationAppError
 from backend.app.utils.sorters import sort_by_timestamp_and_id
 
 # Rules run on every ingestion batch, in order.
@@ -29,7 +29,15 @@ DEFAULT_RULES: tuple[ViolationRule, ...] = (
 )
 
 # Rules that block position-building if triggered.
-BLOCKING_RULES: tuple[ViolationRule, ...] = (detect_sell_before_buy,)
+BLOCKING_RULES: tuple[ViolationRule, ...] = (
+    detect_invalid_values,
+    detect_sell_before_buy,
+)
+
+# Rules persisted after blocking validation has already passed.
+PERSISTED_RULES: tuple[ViolationRule, ...] = tuple(
+    rule for rule in DEFAULT_RULES if rule not in BLOCKING_RULES
+)
 
 
 def detect_violations(
@@ -37,7 +45,16 @@ def detect_violations(
     positions: Iterable[PositionView],
     rules: Iterable[ViolationRule] = DEFAULT_RULES,
 ) -> list[ViolationDraft]:
-    """Run every rule against each client's grouped transactions/positions."""
+    """
+    Detects violations in transactions and positions.
+        
+    - Parameters:
+        - transactions: Iterable[TransactionView] - The transactions to process.
+        - positions: Iterable[PositionView] - The positions to process.
+        - rules: Iterable[ViolationRule] - The rules to apply.
+    - Returns:
+        - list[ViolationDraft] - The detected violations.
+    """
 
     # Group transactions and positions by client ID
     transactions_by_client: dict[str, list[TransactionView]] = defaultdict(list)
@@ -88,16 +105,22 @@ def list_violations(
 def validate_transactions_can_build_positions(
     transactions: list[TransactionView],
 ) -> None:
-    """Raise InsufficientQuantityError if any blocking rule fires."""
+    """
+    Validates that transactions can be used to build positions.
+    
+    - Parameters:
+        - transactions: list[TransactionView] - The transactions to process.
+    - Returns:
+        - None
+    """
     # Run the blocking rules against the transactions
     drafts = detect_violations(transactions, [], BLOCKING_RULES)
 
-    # Since there is only one blocking rule, we can check for it directly
-    blocking = next(
-        (d for d in drafts if d.violation_type == ViolationType.SELL_BEFORE_BUY),
-        None,
-    )
+    # Any draft from a blocking rule prevents position-building.
+    blocking = next(iter(drafts), None)
 
     # If there is a blocking violation, raise an exception
     if blocking is not None:
-        raise InsufficientQuantityError(blocking.message)
+        if blocking.violation_type == ViolationType.SELL_BEFORE_BUY:
+            raise InsufficientQuantityError(blocking.message)
+        raise ValidationAppError(blocking.message)

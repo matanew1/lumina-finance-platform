@@ -8,6 +8,7 @@ from backend.app.repositories.violations import ViolationRepository
 from backend.app.schemas.transactions import TransactionUploadResponse
 from backend.app.services.positions import build_position_snapshots
 from backend.app.services.violations import (
+    PERSISTED_RULES,
     detect_violations,
     validate_transactions_can_build_positions,
 )
@@ -81,9 +82,11 @@ async def upload_transactions_by_file(
             ordered_transactions,
             calculated_positions,
         )
+        # Detect violations based on the ordered transactions and the calculated positions
         detected_violations = detect_violations(
             ordered_transactions,
             position_snapshots,
+            PERSISTED_RULES,
         )
         violations.update_clients_violations(impacted_client_ids, detected_violations)
 
