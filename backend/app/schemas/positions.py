@@ -5,11 +5,12 @@ Protocol types (TransactionView, PositionView) live in shared.protocols and are
 re-exported here so callers importing from this module continue to work.
 """
 from collections import deque
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from pydantic import BaseModel
 
 from backend.app.schemas.shared import PositionView, TransactionView
+from backend.app.utils.constants import MONEY_QUANTUM, ZERO
 
 __all__ = [
     "PositionSnapshot",
@@ -66,35 +67,41 @@ class PositionState:
         self.client_id = client_id
         self.isin = isin
         self.open_lots: deque[OpenLot] = deque()
-        self.realized_pnl = Decimal("0")
-        self.market_price = Decimal("0")
+        self.realized_pnl = ZERO
+        self.market_price = ZERO
+        # Running totals updated incrementally on each buy/sell. Avoids walking
+        # all open lots on every property read and keeps unrealized_pnl free of
+        # divide-then-multiply drift from the average_cost computation.
+        self.total_quantity = ZERO
+        self.total_cost_basis = ZERO
 
     @property
     def quantity(self) -> Decimal:
-        return sum((lot.quantity for lot in self.open_lots), Decimal("0"))
+        return self.total_quantity
 
     @property
     def average_cost(self) -> Decimal:
-        if self.quantity == 0:
-            return Decimal("0")
-
-        total_cost = sum(
-            (lot.quantity * lot.unit_cost for lot in self.open_lots),
-            Decimal("0"),
-        )
-        return total_cost / self.quantity
+        if self.total_quantity == 0:
+            return ZERO
+        return _quantize_money(self.total_cost_basis / self.total_quantity)
 
     @property
     def unrealized_pnl(self) -> Decimal:
-        return self.quantity * (self.market_price - self.average_cost)
+        # Computed from running totals, not from average_cost, so the result
+        # does not inherit rounding from the division above.
+        return self.market_price * self.total_quantity - self.total_cost_basis
 
     def as_result(self) -> PositionSchema:
         return PositionSchema(
             client_id=self.client_id,
             isin=self.isin,
-            quantity=self.quantity,
+            quantity=self.total_quantity,
             average_cost=self.average_cost,
             market_price=self.market_price,
-            realized_pnl=self.realized_pnl,
-            unrealized_pnl=self.unrealized_pnl,
+            realized_pnl=_quantize_money(self.realized_pnl),
+            unrealized_pnl=_quantize_money(self.unrealized_pnl),
         )
+
+
+def _quantize_money(value: Decimal) -> Decimal:
+    return value.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_EVEN)

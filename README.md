@@ -18,21 +18,21 @@ the results in a React UI.
 backend/
   app/
     main.py                  FastAPI app factory
-    api/routes/              upload, clients, positions, violations, analytics
-    api/schemas/             API response models by domain
+    api/routes/              transactions, clients, positions, violations, analytics
+    schemas/                 Pydantic models and shared Protocols (TransactionView, PositionView)
     db/                      SQLAlchemy base, engine, sessions, schema init
     models/                  transaction, position, violation ORM models
     repositories/            database access layer
     services/
-      shared/                CSV parsing, dataframe utilities, Decimal helpers, FIFO math
-      transactions/          upload orchestration, DTOs, ingestion helpers
+      transactions/          upload orchestration, ingestion, response helpers
       clients/               client listing use case
-      positions/             client position responses and position snapshots
+      positions/             FIFO engine and position snapshots
       analytics/             analytics orchestration and calculations
       violations/            violation orchestration and detector rules
-    utils/                   config, logging, app exceptions
+    utils/                   config, logging, exceptions, dataframe and decimal helpers
   tests/
     helpers/                 API fixtures and mock row factories
+    conftest.py
     test_api.py
     test_logic.py
   Dockerfile
@@ -146,6 +146,41 @@ with `VITE_API_BASE_URL` if needed.
 - `GET /violations`
 - `GET /analytics`
 
+### Example API Requests
+
+Assumes the backend is running on `http://localhost:8000`.
+
+Upload a transactions workbook:
+
+```bash
+curl -X POST http://localhost:8000/upload-transactions \
+  -F "file=@data/transactions_sample.xlsx"
+```
+
+List clients:
+
+```bash
+curl http://localhost:8000/clients
+```
+
+Get FIFO positions and P&L for a client:
+
+```bash
+curl http://localhost:8000/clients/C001/positions
+```
+
+List detected rule violations:
+
+```bash
+curl http://localhost:8000/violations
+```
+
+Get aggregated analytics:
+
+```bash
+curl http://localhost:8000/analytics
+```
+
 ## Input File
 
 Sample workbook:
@@ -170,16 +205,26 @@ Rules:
 - `Price > 0`
 - `Action` is `Buy` or `Sell`
 
+## Assumptions
+
+- **Market price** for unrealized P&L is the price of the most recent transaction
+  observed for that `(client_id, isin)`. There is no live quote feed.
+- **Day trading rule** counts buy/sell pairs *per ISIN* within a 24h sliding
+  window. A client with 2 pairs of ISIN-A and 2 pairs of ISIN-B in the same day
+  is not flagged.
+- The 24h window is half-open `(t-24h, t]`: a trade exactly 24h old is outside.
+- FIFO ties on identical timestamps are broken by `transaction_id` lexicographic
+  order.
+
 ## Tests
 
 Backend:
 
 ```bash
 python -m pytest backend/tests
-python -m compileall backend
 ```
 
-Frontend:
+Frontend (no test runner configured — `build` is used as a smoke check):
 
 ```bash
 cd frontend

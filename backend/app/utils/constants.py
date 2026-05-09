@@ -5,6 +5,10 @@ from decimal import Decimal
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
 PERCENT = Decimal("100")
+# Matches the Numeric(18, 6) scale used by the positions table; quantizing
+# Decimal results to this scale at output boundaries keeps API responses
+# stable and prevents repeating-decimal drift from divisions.
+MONEY_QUANTUM = Decimal("0.000001")
 
 # Analytics Thresholds
 SECONDS_PER_DAY = Decimal("86400")

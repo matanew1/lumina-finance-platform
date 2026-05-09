@@ -562,6 +562,12 @@ tbody tr:hover td { background: #f8fafc; }
   gap: 2px;
 }
 
+.metric-value-ltr {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}
+
 .metric-primary {
   font-size: 14px;
   font-weight: 800;

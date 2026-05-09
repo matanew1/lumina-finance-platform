@@ -22,6 +22,7 @@ __all__ = [
     "PositionView",
     # Internal helper
     "HoldingLot",
+    "HoldingTimeTotals",
     # Result / response models (single source of truth)
     "TopTradedIsin",
     "ClientAverageHoldingTime",
@@ -34,8 +35,32 @@ __all__ = [
 # ── internal helper ────────────────────────────────────────────────────────────
 
 class HoldingLot(BaseModel):
+    """A lot of a specific isin held by a client, used for calculating average holding time."""
     quantity: Decimal
     timestamp: datetime
+
+
+class HoldingTimeTotals(BaseModel):
+    """Totals for calculating average holding time."""
+    quantity_weighted_holding_seconds: Decimal = Decimal("0")
+    closed_quantity: Decimal = Decimal("0")
+
+    def record_closed_holding(
+        self,
+        holding_seconds: Decimal,
+        quantity: Decimal,
+    ) -> None:
+        """
+        Record a closed holding.
+        
+        Args:
+            holding_seconds (Decimal): The holding seconds.
+            quantity (Decimal): The quantity.
+        """
+        # update the weighted average by adding the holding seconds multiplied by the quantity
+        self.quantity_weighted_holding_seconds += holding_seconds * quantity
+        # update the closed quantity by adding the quantity
+        self.closed_quantity += quantity
 
 
 # ── result / response models ───────────────────────────────────────────────────

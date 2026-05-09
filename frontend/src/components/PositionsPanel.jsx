@@ -1,4 +1,4 @@
-import { formatDecimal, sumDecimal } from "../utils/format.js";
+import { formatCurrency, formatDecimal, sumDecimal } from "../utils/format.js";
 import { Panel, EmptyRow } from "./shared.jsx";
 
 export function PositionsPanel({ positions }) {
@@ -15,9 +15,9 @@ export function PositionsPanel({ positions }) {
             <th>ISIN</th>
             <th>Quantity</th>
             <th>Avg Cost</th>
-            <th>Market</th>
-            <th>Realized</th>
-            <th>Unrealized</th>
+            <th>Market Price</th>
+            <th>Realized P&amp;L</th>
+            <th>Unrealized P&amp;L</th>
           </tr>
         </thead>
         <tbody>
@@ -27,13 +27,13 @@ export function PositionsPanel({ positions }) {
                 <span className="cell-isin">{position.isin}</span>
               </td>
               <td>{formatDecimal(position.quantity)}</td>
-              <td>{formatDecimal(position.average_cost)}</td>
-              <td>{formatDecimal(position.market_price)}</td>
+              <td>{formatCurrency(position.average_cost)}</td>
+              <td>{formatCurrency(position.market_price)}</td>
               <td className={signClass(position.realized_pnl)}>
-                {formatDecimal(position.realized_pnl)}
+                {formatCurrency(position.realized_pnl)}
               </td>
               <td className={signClass(position.unrealized_pnl)}>
-                {formatDecimal(position.unrealized_pnl)}
+                {formatCurrency(position.unrealized_pnl)}
               </td>
             </tr>
           ))}
@@ -44,13 +44,13 @@ export function PositionsPanel({ positions }) {
         <span className="total-item">
           <span className="total-label">Realized</span>
           <span className={`total-value ${signClass(totals.realized)}`}>
-            {formatDecimal(totals.realized)}
+            {formatCurrency(totals.realized)}
           </span>
         </span>
         <span className="total-item">
           <span className="total-label">Unrealized</span>
           <span className={`total-value ${signClass(totals.unrealized)}`}>
-            {formatDecimal(totals.unrealized)}
+            {formatCurrency(totals.unrealized)}
           </span>
         </span>
       </div>
