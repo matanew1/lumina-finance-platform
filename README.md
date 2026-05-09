@@ -1,121 +1,113 @@
 # Lumina Finance Platform
 
-A finance platform skeleton with a FastAPI backend, SQLAlchemy models, PostgreSQL/SQLite database support, Swagger UI, and a simple React frontend.
+Mini full-stack financial transactions platform for Lumina Capital. The app
+uploads transaction files, validates them, stores processed data, calculates
+FIFO positions and P&L, detects rule violations, exposes analytics, and shows
+the results in a React UI.
 
-Transaction upload ingestion, validation, client listing, FIFO position calculation, violation detection, and analytics are implemented.
-
-## Tech Stack
+## Stack
 
 - Backend: Python, FastAPI, SQLAlchemy, pandas
-- Database: PostgreSQL with Docker Compose; SQLite is also supported by changing `DATABASE_URL`
+- Database: SQLite by default; PostgreSQL is also supported through `DATABASE_URL`
 - Frontend: React with Vite
-- API docs: Swagger UI through FastAPI
+- Tests: pytest
 
-## Project Structure
+## Structure
 
 ```text
 backend/
-  db/
-    database.py    singleton database service, sessions, and init helpers
-    models/        domain-grouped SQLAlchemy models
-    repositories/  domain-grouped database access layer
-  controllers/     feature-based FastAPI controller packages
-  samples/         sample input files
-  schemas/         Pydantic request/response schemas
-  services/        feature-based business service packages
-  tests/           backend tests
-  utils/
-    config/        app settings
-    errors/        app exceptions and DB error helpers
-    transactions/  transaction upload parsing and validation helpers
-    secrets/       local environment files
+  app/
+    main.py              FastAPI app factory
+    config.py            settings and logging
+    exceptions.py        API/domain exceptions
+    api/routes/         upload, clients, positions, violations, analytics
+    db/base.py           SQLAlchemy declarative base
+    db/session.py        engine, sessions, schema initialization
+    models/              transaction, position, violation ORM models
+    repositories/        database access layer
+    schemas/             Pydantic request/response models by domain
+    services/
+      shared/
+        csv_handler.py       CSV/XLSX parsing
+        dataframe_utils.py   reusable dataframe cell normalization
+        decimal_utils.py     shared Decimal constants and formatting
+        math_utils.py        shared finance math
+      transactions/
+        transactions_service.py transaction upload orchestration
+        schemas.py           transaction processing DTOs
+        helpers/             upload parsing, validation, and responses
+      clients/
+        query_service.py     client listing use case
+      positions/
+        positions_service.py client position response assembly
+        schemas.py           position service DTOs and protocols
+        helpers/             position snapshot helpers
+      analytics/
+        analytics_service.py analytics orchestration
+        schemas.py           analytics service DTOs and protocols
+        helpers/             analytics calculations
+      violations/
+        violations_service.py violation orchestration, queries, validation
+        schemas.py           violation rule abstractions and DTOs
+        helpers/             individual violation detectors
+  tests/
+    helpers/             API fixtures and mock row factories
+    test_api.py
+    test_logic.py
+  requirements.txt
+data/
+  transactions_sample.xlsx
 frontend/
-  src/             React UI skeleton
+  src/
+    App.jsx
+    services/api.js
+AI_USAGE.md
 docker-compose.yml
 requirements.txt
 ```
 
-## Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- Docker Desktop or Docker Engine, only if using PostgreSQL instead of SQLite
-
-## 1. Backend Environment
-
-From the project root:
+## Backend Setup
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+cp backend/.env.example backend/.env
 ```
 
-Create the local backend environment file:
+The default `backend/.env.example` uses PostgreSQL:
+
+```text
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/lumina_finance
+```
+
+For SQLite without Docker, change it to:
+
+```text
+DATABASE_URL=sqlite:///./backend/lumina.db
+```
+
+If no `.env` file exists, the backend also falls back to SQLite at
+`backend/lumina.db`.
+
+## Run Backend
+
+SQLite:
 
 ```bash
-cp backend/utils/secrets/.env.example backend/utils/secrets/.env
+uvicorn backend.app.main:app --reload
 ```
 
-Default PostgreSQL database URL:
-
-```text
-postgresql+psycopg://postgres:postgres@localhost:5432/lumina_finance
-```
-
-SQLite fallback URL, if you want to run without Docker:
-
-```text
-sqlite:///./lumina_finance.db
-```
-
-## 2. Choose And Initialize The Database
-
-### Option A: PostgreSQL With Docker Compose
+PostgreSQL:
 
 ```bash
 docker compose up -d postgres
+uvicorn backend.app.main:app --reload
 ```
 
-Check that the container is running:
+API docs: `http://127.0.0.1:8000/docs`
 
-```bash
-docker compose ps
-```
-
-### Option B: SQLite Without Docker
-
-Change `DATABASE_URL` in `backend/utils/secrets/.env` to:
-
-```text
-sqlite:///./lumina_finance.db
-```
-
-This creates a local `lumina_finance.db` file in the project root when tables are initialized.
-
-### Initialize Tables
-
-The backend initializes tables automatically on startup by default. Set `AUTO_INIT_DB=false` in `backend/utils/secrets/.env` if you want to disable that.
-
-Startup creates:
-
-- `transactions`
-- `positions`
-- `violations`
-
-## 3. Run Backend API
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-Backend URLs:
-
-- API root: `http://127.0.0.1:8000`
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
-
-Registered endpoints:
+## API
 
 - `POST /upload-transactions`
 - `GET /clients`
@@ -123,31 +115,15 @@ Registered endpoints:
 - `GET /violations`
 - `GET /analytics`
 
-## 4. Run Frontend
+## Input File
 
-In a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend URL:
+Sample workbook:
 
 ```text
-http://127.0.0.1:5173
+data/transactions_sample.xlsx
 ```
 
-## 5. Sample Data
-
-The sample workbook is stored at:
-
-```text
-backend/utils/samples/transactions_sample.xlsx
-```
-
-Uploads support `.xlsx` and `.csv` files with these transaction columns:
+Required columns:
 
 - `ClientId`
 - `TransactionId`
@@ -157,50 +133,35 @@ Uploads support `.xlsx` and `.csv` files with these transaction columns:
 - `Price`
 - `Timestamp`
 
-## 6. Tests And Verification
+Validation rules:
 
-Run backend tests:
+- `Quantity > 0`
+- `Price > 0`
+- `Action` is `Buy` or `Sell`
+
+## Frontend
 
 ```bash
-source .venv/bin/activate
-python -m pytest backend/tests
+cd frontend
+npm install
+npm run dev
 ```
 
-Run backend syntax check:
+Open `http://127.0.0.1:5173`.
+
+The UI uploads CSV/XLSX files, lists clients, displays positions, displays
+violations, and shows analytics from the backend API.
+
+## Tests
 
 ```bash
+python -m pytest backend/tests
 python -m compileall backend
 ```
 
-Build frontend:
+Frontend build check:
 
 ```bash
 cd frontend
 npm run build
 ```
-
-## 7. Stop Services
-
-Stop PostgreSQL while keeping the database volume:
-
-```bash
-docker compose down
-```
-
-Stop PostgreSQL and delete local database data:
-
-```bash
-docker compose down -v
-```
-
-## Notes
-
-- `backend/utils/secrets/.env` is ignored by git and should contain local secrets only.
-- `backend/utils/secrets/.env.example` is the shareable template.
-- PostgreSQL is the recommended setup for this project, and SQLite can be used by changing only `DATABASE_URL`.
-- `POST /upload-transactions` parses CSV/XLSX files, normalizes and validates transactions, applies FIFO in chronological order, persists transactions, stores refreshed current positions, and returns only an upload summary.
-- `GET /clients` lists distinct client IDs from transaction data.
-- `GET /clients/{client_id}/positions` reads stored positions per ISIN with realized and unrealized P&L.
-- `GET /violations` reads persisted compliance violations.
-- `GET /analytics` returns top traded ISINs, client holding-time averages, the most volatile client, and ISIN concentration reports.
-- Database tables are created directly from SQLAlchemy metadata.
