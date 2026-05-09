@@ -4,7 +4,6 @@
 
 - **Codex** — wrote and refactored code.
 - **Claude Code** — reviewed structure and ran a deep check on finance logic.
-- **Antigravity IDE** — inline code suggestions while I typed.
 
 ## How I Worked With AI
 
