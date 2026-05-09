@@ -8,52 +8,34 @@ the results in a React UI.
 ## Stack
 
 - Backend: Python, FastAPI, SQLAlchemy, pandas
-- Database: SQLite by default; PostgreSQL is also supported through `DATABASE_URL`
+- Database: PostgreSQL with Docker Compose, or SQLite for simple local runs
 - Frontend: React with Vite
 - Tests: pytest
 
-## Structure
+## Project Structure
 
 ```text
 backend/
   app/
-    main.py              FastAPI app factory
-    config.py            settings and logging
-    exceptions.py        API/domain exceptions
-    api/routes/         upload, clients, positions, violations, analytics
-    db/base.py           SQLAlchemy declarative base
-    db/session.py        engine, sessions, schema initialization
-    models/              transaction, position, violation ORM models
-    repositories/        database access layer
-    schemas/             Pydantic request/response models by domain
+    main.py                  FastAPI app factory
+    api/routes/              upload, clients, positions, violations, analytics
+    api/schemas/             API response models by domain
+    db/                      SQLAlchemy base, engine, sessions, schema init
+    models/                  transaction, position, violation ORM models
+    repositories/            database access layer
     services/
-      shared/
-        csv_handler.py       CSV/XLSX parsing
-        dataframe_utils.py   reusable dataframe cell normalization
-        decimal_utils.py     shared Decimal constants and formatting
-        math_utils.py        shared finance math
-      transactions/
-        transactions_service.py transaction upload orchestration
-        schemas.py           transaction processing DTOs
-        helpers/             upload parsing, validation, and responses
-      clients/
-        query_service.py     client listing use case
-      positions/
-        positions_service.py client position response assembly
-        schemas.py           position service DTOs and protocols
-        helpers/             position snapshot helpers
-      analytics/
-        analytics_service.py analytics orchestration
-        schemas.py           analytics service DTOs and protocols
-        helpers/             analytics calculations
-      violations/
-        violations_service.py violation orchestration, queries, validation
-        schemas.py           violation rule abstractions and DTOs
-        helpers/             individual violation detectors
+      shared/                CSV parsing, dataframe utilities, Decimal helpers, FIFO math
+      transactions/          upload orchestration, DTOs, ingestion helpers
+      clients/               client listing use case
+      positions/             client position responses and position snapshots
+      analytics/             analytics orchestration and calculations
+      violations/            violation orchestration and detector rules
+    utils/                   config, logging, app exceptions
   tests/
-    helpers/             API fixtures and mock row factories
+    helpers/                 API fixtures and mock row factories
     test_api.py
     test_logic.py
+  Dockerfile
   requirements.txt
 data/
   transactions_sample.xlsx
@@ -61,12 +43,53 @@ frontend/
   src/
     App.jsx
     services/api.js
-AI_USAGE.md
+  Dockerfile
 docker-compose.yml
 requirements.txt
 ```
 
-## Backend Setup
+## Flow 1: Docker Compose
+
+Use this path when you want the full app with one command. It starts:
+
+- PostgreSQL on `localhost:5432`
+- FastAPI on `http://localhost:8000`
+- React/Vite on `http://localhost:5173`
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+- Frontend: `http://localhost:5173`
+- API docs: `http://localhost:8000/docs`
+
+The backend container uses PostgreSQL through the internal Compose hostname
+`postgres`:
+
+```text
+postgresql+psycopg://postgres:postgres@postgres:5432/lumina_finance
+```
+
+Stop the app:
+
+```bash
+docker compose down
+```
+
+Stop the app and delete the PostgreSQL volume:
+
+```bash
+docker compose down -v
+```
+
+## Flow 2: Manual Local Setup
+
+Use this path when you want to run backend and frontend directly on your
+machine.
+
+### Backend
 
 ```bash
 python3 -m venv .venv
@@ -75,37 +98,45 @@ python -m pip install -r requirements.txt
 cp backend/.env.example backend/.env
 ```
 
-The default `backend/.env.example` uses PostgreSQL:
-
-```text
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/lumina_finance
-```
-
-For SQLite without Docker, change it to:
+For SQLite without Docker, set this in `backend/.env`:
 
 ```text
 DATABASE_URL=sqlite:///./backend/lumina.db
 ```
 
-If no `.env` file exists, the backend also falls back to SQLite at
-`backend/lumina.db`.
+Backend settings are loaded from environment variables or `backend/.env`.
+All keys shown in `backend/.env.example` are required; the app does not rely on
+hardcoded runtime defaults for database URL, CORS, logging, or app settings.
 
-## Run Backend
-
-SQLite:
-
-```bash
-uvicorn backend.app.main:app --reload
-```
-
-PostgreSQL:
+For PostgreSQL, keep the default `backend/.env.example` database URL and start
+Postgres:
 
 ```bash
 docker compose up -d postgres
+```
+
+Run the backend:
+
+```bash
 uvicorn backend.app.main:app --reload
 ```
 
-API docs: `http://127.0.0.1:8000/docs`
+API docs: `http://localhost:8000/docs`
+
+### Frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+The frontend defaults to `http://localhost:8000` for the backend API. Override it
+with `VITE_API_BASE_URL` if needed.
 
 ## API
 
@@ -133,33 +164,22 @@ Required columns:
 - `Price`
 - `Timestamp`
 
-Validation rules:
+Rules:
 
 - `Quantity > 0`
 - `Price > 0`
 - `Action` is `Buy` or `Sell`
 
-## Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://127.0.0.1:5173`.
-
-The UI uploads CSV/XLSX files, lists clients, displays positions, displays
-violations, and shows analytics from the backend API.
-
 ## Tests
+
+Backend:
 
 ```bash
 python -m pytest backend/tests
 python -m compileall backend
 ```
 
-Frontend build check:
+Frontend:
 
 ```bash
 cd frontend

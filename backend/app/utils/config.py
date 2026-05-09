@@ -4,45 +4,26 @@ import logging
 import sys
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_SQLITE_DATABASE_URL = f"sqlite:///{(BACKEND_DIR / 'lumina.db').as_posix()}"
-DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 LOG_FORMAT = "%(levelname)s: %(message)s | [%(name)s] | %(funcName)s | %(asctime)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class Settings(BaseSettings):
-    app_name: str = Field(default="Lumina Finance Platform", validation_alias="APP_NAME")
-    debug: bool = Field(default=False, validation_alias="APP_DEBUG")
-    auto_init_db: bool = Field(default=True, validation_alias="AUTO_INIT_DB")
-    log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
-    database_url: str = Field(
-        default=DEFAULT_SQLITE_DATABASE_URL,
-        validation_alias="DATABASE_URL",
-    )
-    cors_origins: list[str] = Field(
-        default_factory=lambda: DEFAULT_CORS_ORIGINS.copy(),
-        validation_alias="CORS_ORIGINS",
-    )
+    app_name: str = Field(validation_alias="APP_NAME")
+    debug: bool = Field(validation_alias="APP_DEBUG")
+    auto_init_db: bool = Field(validation_alias="AUTO_INIT_DB")
+    log_level: str = Field(validation_alias="LOG_LEVEL")
+    database_url: str = Field(validation_alias="DATABASE_URL")
+    cors_origins: list[str] = Field(validation_alias="CORS_ORIGINS")
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (init_settings, env_settings, dotenv_settings, file_secret_settings)
 
 
 @lru_cache

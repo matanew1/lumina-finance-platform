@@ -1,160 +1,114 @@
-# AI_USAGE.md
+# AI Usage
 
 ## AI Tools Used
 
-- Codex was used for codebase refactoring, backend/frontend implementation, test creation, validation, and documentation updates.
-- **Claude Code Sonnet 4.6** - used as a reviewer agent for business-logic review, code-structure review, and refactor suggestions.
+- **Codex**: implementation, refactoring, test cleanup, debugging, and documentation.
+- **Claude Code Sonnet 4.6**: reviewer-style feedback on business logic and structure.
 
----
+## Main Example Prompts
 
-## Example Prompts
+These prompts show the main development flow.
 
-Only the main prompts are listed here.
-
-- Create a clean FastAPI, SQLAlchemy, PostgreSQL backend skeleton with route/controller/service/model/db layers.
-- Add Docker Compose PostgreSQL and connect the backend to the database.
-- Implement transaction ingestion and validation: load Excel/CSV, normalize data, validate `quantity > 0`, `price > 0`, and action is `Buy` or `Sell`.
-- Implement FIFO cost calculation, realized/unrealized P&L, and positions per ISIN.
-- Improve FIFO performance by replacing list front-removal with `deque`, reducing the algorithm from potential `O(n^2)` behavior to `O(n)`.
-- Move database operations into repositories and keep services/controllers separated.
-- Review the business logic and suggest refactor changes for cleaner separation of concerns.
-- Persist positions after transaction upload, then make `GET /clients/{client_id}/positions` read from the positions table.
-- Implement violations: invalid values, sell before buy, day trading, and risk concentration.
-- Implement Part F analytics through `GET /analytics`.
-- Refactor service modules into class-based helpers and move shared service data shapes into `types.py` files.
-- Reintroduce dataclasses in service `types.py` files where they make the business logic shorter and clearer.
-
----
+- Build a FastAPI finance backend with SQLAlchemy models, repositories, services, routes, and tests.
+- Implement CSV/XLSX transaction upload with parsing, normalization, row validation, duplicate handling, and upload summary responses.
+- Implement FIFO position calculation with realized P&L, unrealized P&L, and persisted client positions.
+- Add violation detection for invalid values, sell-before-buy, day trading, and risk concentration.
+- Add analytics for top traded ISINs, average holding time, most volatile client, and ISIN concentration.
+- Split the original route file into feature route modules.
+- Split rule logic by single responsibility.
+- Restructure services into domain folders: transactions, clients, positions, violations, analytics, and shared.
+- Move reusable transaction helper logic into a transaction helpers folder.
+- Move cross-domain helper logic into a shared services folder.
+- Split API schemas by domain.
+- Make `test_api.py` thinner by moving mocks and helper functions into test helper modules.
+- Review the code structure against SRP and clean up files with too many responsibilities.
+- Update Docker Compose so the full app can start at once, and document both Docker and manual setup flows.
+- Make backend settings come from environment variables or `backend/.env` instead of hidden runtime defaults.
 
 ## What Code Was Generated
 
-- FastAPI controllers for:
-  - `POST /upload-transactions`
-  - `GET /clients`
-  - `GET /clients/{client_id}/positions`
-  - `GET /violations`
-  - `GET /analytics`
-- SQLAlchemy models for:
-  - `transactions`
-  - `positions`
-  - `violations`
-- Repository layer for:
-  - transactions
-  - positions
-  - clients
-  - violations
-  - analytics
-- Transaction ingestion logic using pandas for CSV/XLSX parsing.
-- FIFO calculation logic for positions, realized P&L, and unrealized P&L.
-- Upload workflow that:
-  - validates transactions
-  - persists transactions
-  - recalculates positions
-  - generates violations
-  - commits the processed data together
-- Violation service and rule classes.
-- Analytics service, analytics report class, and response schema.
-- Pytest tests for transaction upload, transaction validation, FIFO, violations, and analytics behavior.
-- README setup instructions.
+- FastAPI application setup, route modules, exception handlers, and response schemas.
+- SQLAlchemy models and repository classes for transactions, positions, violations, clients, and analytics queries.
+- Transaction upload flow that reads CSV/XLSX files, validates rows, persists transactions, recalculates positions, detects violations, and commits the result.
+- FIFO finance logic for open lots, realized P&L, unrealized P&L, average cost, and market value.
+- Violation detector modules for invalid values, sell-before-buy, day trading, and risk concentration.
+- Analytics calculations for top traded ISINs, average holding time, most volatile client, and ISIN concentration.
+- Shared helpers for upload parsing, dataframe cell normalization, Decimal formatting, and reusable finance math.
+- Backend tests for API behavior and business logic.
+- A React operations console that uploads transaction files and displays clients, positions, violations, and analytics.
+- Docker setup for running PostgreSQL, FastAPI, and the React frontend together with `docker compose up --build`.
+- README and project-structure documentation updates.
 
----
+## My Thinking And Process
+
+- I first used AI to generate a working vertical slice: API endpoints, database models, services, repositories, and tests.
+- After the first implementation worked, I reviewed the structure and asked AI to separate files by responsibility instead of keeping large service or route modules.
+- I moved from a broad controller/service layout into a clearer `backend/app` structure with domain-based packages.
+- I separated API schemas, service DTOs, repositories, route modules, and helper functions so each layer has a clearer purpose.
+- I treated tests as feedback. When endpoint tests failed, I used the failures to fix API contracts, response shapes, and error handling.
+- I kept domain-specific code inside its domain folder and moved only reusable logic into `services/shared`.
+- I added Docker Compose only after the app structure was stable, so container setup reflected the real backend, frontend, and database boundaries.
+- I made environment configuration explicit: Docker injects variables through Compose, while manual local setup uses `backend/.env`.
+- I used the AI output as a draft, then refined naming, boundaries, and module ownership to make the project easier to review.
 
 ## What I Modified
 
-I treated the AI output as a starting point, then changed it to make the project cleaner, more correct, and easier to review.
-
-- **Project organization:** moved environment files into `backend/utils/secrets` and the sample workbook into `backend/utils/samples` so local configuration and sample data are separated from application code.
-- **Naming clarity:** renamed the original DB-schema wording to API `schemas`, because these files describe request/response data and not database tables.
-- **Layer separation:** refactored the backend into controller, service, repository, schema, model, DB, utility, and test layers instead of keeping too much logic in shared files.
-- **Feature packaging:** grouped controllers and services into feature folders such as `analytics`, `clients`, `positions`, `transactions`, and `violations` for a consistent project structure.
-- **Reviewer feedback:** applied Sonnet review feedback to improve business-logic structure and split responsibilities between controllers, services, and repositories.
-- **Repository responsibility:** moved persistence and query logic out of generic utility/helper functions and into repository classes, so services focus on business flow.
-- **Endpoint ownership:** kept `client_controller.py` responsible for `GET /clients` and `position_controller.py` responsible for `GET /clients/{client_id}/positions`.
-- **Upload API contract:** changed `POST /upload-transactions` to return `201 Created` and return only summary fields plus validation errors, instead of echoing full transaction rows.
-- **Source of truth:** changed `GET /clients` to read client IDs only from `transactions`, because positions are derived from uploaded transaction data.
-- **FIFO execution flow:** changed `PositionService` to read stored positions instead of recalculating FIFO on every request, because FIFO is already applied after transaction upload.
-- **FIFO performance:** replaced list-based front removal with `collections.deque`, improving oldest-lot consumption from potential `O(n^2)` behavior to `O(n)`.
-- **Violation responses:** added persisted violation lookup and structured response fields, including severity and related transaction IDs where available.
-- **Analytics:** replaced the TODO analytics endpoint with structured Part F analytics based on processed transactions and positions.
-- **Analytics modularity:** consolidated analytics calculations into an `AnalyticsReports` class, so each report has one method and `AnalyticsService` only orchestrates data loading and report assembly.
-- **Database setup:** kept PostgreSQL as the main Docker Compose setup while adding SQLite support through the SQLAlchemy connection string for easier local grading.
-- **Service typing:** added local `types.py` files for analytics, clients, positions, transactions, and violations so shared protocols, aliases, and dataclasses live beside the services that use them.
-- **Class-based service helpers:** converted standalone FIFO and analytics helper functions into `FifoCalculator` and `AnalyticsReports` classes.
-- **Dataclass cleanup:** restored dataclasses for compact service state and draft objects such as `TransactionIngestionResult`, `PositionState`, `HoldingLot`, `ClientContext`, `PositionSnapshot`, and `ViolationDraft`.
-
----
+- Reorganized backend code into a single `backend/app` application package.
+- Replaced one large route module with feature route modules.
+- Split API response schemas by domain.
+- Moved database access into repositories.
+- Split services into domain folders with `*_service.py`, `schemas.py`, and `helpers/` files.
+- Moved dataframe parsing and Decimal percentage helpers into shared service utilities.
+- Kept transaction upload response builders inside the transaction domain because they depend on transaction-specific response models.
+- Moved test mocks, fake sessions, and helper functions out of `test_api.py`.
+- Updated the frontend to use real backend endpoints instead of placeholder endpoint cards.
+- Added Dockerfiles for backend and frontend and expanded Compose from database-only to full-stack startup.
+- Updated backend config so required settings are injected from environment variables or `backend/.env`.
+- Updated README and sample-data paths to match the final structure.
 
 ## Mistakes And How I Fixed Them
 
-These are only the issues that were caught through manual review/user feedback during development.
+- **Valid CSV uploads returned `400`.**  
+  I fixed transaction parsing and error mapping so valid uploads return `201`, invalid files return `400`, and duplicate transaction IDs return `409`.
 
-- **The first structure separated routes and controllers in a way that was too fragmented.**  
-  Fixed by consolidating route and controller behavior per feature controller.
+- **The upload response returned too much data.**  
+  I changed it to return only upload status, row counts, persisted row count, and row-level errors.
 
-- **Client and position endpoints were temporarily merged into one combined controller.**  
-  Fixed by splitting them back into separate `client_controller.py` and `position_controller.py` files for better separation of concerns.
+- **`GET /clients` used the wrong source of truth.**  
+  I changed it to read clients from uploaded transactions, because positions are derived data.
 
-- **Some DB operations were placed in utility/helper functions instead of repositories.**  
-  Fixed by moving persistence and query logic into repository classes.
+- **The position endpoint recalculated FIFO on read.**  
+  I changed it to read persisted positions and kept FIFO recalculation in the upload workflow.
 
-- **Duplicate transaction IDs needed proper HTTP behavior.**  
-  Fixed by translating duplicate transaction persistence errors into `409 Conflict`.
+- **FIFO used the wrong data structure for oldest-lot removal.**  
+  I replaced list front-removal with `collections.deque` and `popleft()`, improving repeated lot consumption from potential `O(n^2)` behavior toward `O(n)`.
 
-- **A mistake was found in the validation rules.**  
-  Fixed after manual review by aligning the validation with the assignment requirements: `quantity > 0`, `price > 0`, and `action` must be `Buy` or `Sell`.
+- **FIFO state names were unclear.**  
+  I clarified the model with names such as `OpenLot`, `PositionState`, and `PositionCalculation`.
 
-- **The upload endpoint returned too much data.**  
-  Fixed by removing the transaction row payload from the response and returning only:
-  - `status`
-  - `total_rows`
-  - `valid_rows`
-  - `invalid_rows`
-  - `persisted_rows`
-  - `errors`
+- **API tests became too heavy.**  
+  I moved fake sessions, mock rows, and helper functions into `backend/tests/helpers`.
 
-- **`GET /clients` originally queried both `transactions` and `positions`.**  
-  Fixed by querying only `transactions`, because transactions are the source of truth and positions are derived data.
+- **Some response schemas and test doubles drifted apart.**  
+  I aligned test mocks with the real response models, including fields such as violation severity.
 
-- **`PositionService` recalculated FIFO even though FIFO already runs after transaction upload.**  
-  Fixed by making `PositionService` read persisted rows from the `positions` table.
+- **Risk concentration violations missed a useful transaction reference.**  
+  I added position snapshots with the latest transaction ID for each client/ISIN and used that in violation drafts.
 
-- **The FIFO naming was unclear.**  
-  Fixed by replacing unclear lot/helper naming with clearer names such as `OpenLot`, `apply_buy`, and `apply_sell`.
+- **Analytics started as placeholder behavior.**  
+  I replaced it with concrete analytics for traded ISINs, holding time, volatility, and concentration.
 
-- **FIFO lot consumption needed better performance.**  
-  Fixed after user feedback by replacing list front-removal with `collections.deque`, improving the FIFO algorithm from potential `O(n^2)` behavior to `O(n)`.
+- **The first SRP pass still left too much logic in large files.**  
+  I split transaction ingestion, violation detectors, analytics calculations, position snapshots, and shared helpers into smaller modules.
 
-- **The first simplification pass overused plain dictionaries.**  
-  Fixed after user feedback by bringing back dataclasses in service `types.py` files where attribute access made the code shorter and easier to follow.
+- **Documentation described an older structure.**  
+  I rewrote the README and AI usage notes to match the final `backend/app` structure.
 
-- **Risk concentration violations returned `transaction_id: null`.**  
-  Fixed by attaching the latest transaction ID for the affected client/ISIN.
+- **Docker Compose originally started only PostgreSQL.**  
+  I updated it to start PostgreSQL, the FastAPI backend, and the React frontend together, with health checks and service dependencies.
 
-- **The violation endpoint test data was missing `severity`.**  
-  Fixed by updating the fake violation records to match the response schema.
+- **The backend `.env` path was wrong after the app refactor.**  
+  I fixed the config path so settings load from `backend/.env` instead of accidentally looking for `backend/app/.env`.
 
-- **`GET /analytics` was only a TODO endpoint.**  
-  Fixed by implementing structured analytics for:
-  - top 3 most traded ISINs
-  - average holding time per client
-  - most volatile client
-  - ISIN concentration report
-
-- **The documentation could look PostgreSQL-only even though the assignment allowed SQLite as a minimum.**  
-  Fixed by documenting PostgreSQL with Docker Compose and adding a SQLite `DATABASE_URL` fallback that can run without Docker.
-
----
-
-## Validation
-
-Final validation commands:
-
-```bash
-.venv/bin/pytest backend/tests
-```
-
-Final result:
-
-- Current backend test suite passed: `5 passed`.
-- FIFO calculation results were also checked manually against the Excel sample to make sure the AI-generated logic did not invent or distort the expected calculations.
-- SQLite fallback configuration was covered by tests for the SQLAlchemy engine settings.
+- **The backend could silently fall back to hardcoded config defaults.**  
+  I made settings required so deployment and local setup must provide values through Compose environment variables or `backend/.env`.
