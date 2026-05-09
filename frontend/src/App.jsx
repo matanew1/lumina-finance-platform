@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   fetchAnalytics,
@@ -7,6 +7,14 @@ import {
   fetchViolations,
   uploadTransactions
 } from "./services/api.js";
+
+import { Header } from "./components/Header.jsx";
+import { TabNav } from "./components/TabNav.jsx";
+import { Toolbar } from "./components/Toolbar.jsx";
+import { PositionsPanel } from "./components/PositionsPanel.jsx";
+import { ViolationsPanel } from "./components/ViolationsPanel.jsx";
+import { AnalyticsPanel } from "./components/AnalyticsPanel.jsx";
+import { UploadSummary } from "./components/shared.jsx";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -18,14 +26,7 @@ function App() {
   const [uploadResult, setUploadResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const totals = useMemo(
-    () => ({
-      realized: sumDecimal(positions.map((position) => position.realized_pnl)),
-      unrealized: sumDecimal(positions.map((position) => position.unrealized_pnl))
-    }),
-    [positions]
-  );
+  const [activeTab, setActiveTab] = useState("positions");
 
   useEffect(() => {
     refreshData();
@@ -103,197 +104,39 @@ function App() {
   return (
     <main className="app-shell">
       <section className="workspace">
-        <header className="page-header">
-          <div>
-            <p className="eyebrow">Lumina Finance</p>
-            <h1>Operations Console</h1>
-          </div>
-          <span className="status-pill">{loading ? "Loading" : "Ready"}</span>
-        </header>
+        <Header loading={loading} onRefresh={() => refreshData()} />
 
-        {error ? <div className="banner error">{error}</div> : null}
+        {error ? (
+          <div className="banner error">
+            <svg aria-hidden="true" className="banner-icon" viewBox="0 0 16 16" width="16">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+              <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            {error}
+          </div>
+        ) : null}
         {uploadResult ? <UploadSummary result={uploadResult} /> : null}
 
-        <section className="toolbar" aria-label="Transaction upload">
-          <form className="upload-row" onSubmit={handleUploadSubmit}>
-            <input
-              accept=".csv,.xlsx"
-              aria-label="Transaction file"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              type="file"
-            />
-            <button disabled={loading} type="submit">
-              Upload
-            </button>
-          </form>
+        <Toolbar
+          file={file}
+          onFileChange={setFile}
+          onSubmit={handleUploadSubmit}
+          loading={loading}
+          clients={clients}
+          selectedClient={selectedClient}
+          onClientChange={handleClientChange}
+        />
 
-          <label className="client-filter">
-            Client
-            <select
-              disabled={!clients.length || loading}
-              onChange={handleClientChange}
-              value={selectedClient}
-            >
-              {clients.map((clientId) => (
-                <option key={clientId} value={clientId}>
-                  {clientId}
-                </option>
-              ))}
-            </select>
-          </label>
-        </section>
+        <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <section className="content-grid">
-          <Panel title="Positions">
-            <table>
-              <thead>
-                <tr>
-                  <th>ISIN</th>
-                  <th>Quantity</th>
-                  <th>Avg Cost</th>
-                  <th>Market</th>
-                  <th>Realized</th>
-                  <th>Unrealized</th>
-                </tr>
-              </thead>
-              <tbody>
-                {positions.map((position) => (
-                  <tr key={`${position.client_id}-${position.isin}`}>
-                    <td>{position.isin}</td>
-                    <td>{formatDecimal(position.quantity)}</td>
-                    <td>{formatDecimal(position.average_cost)}</td>
-                    <td>{formatDecimal(position.market_price)}</td>
-                    <td>{formatDecimal(position.realized_pnl)}</td>
-                    <td>{formatDecimal(position.unrealized_pnl)}</td>
-                  </tr>
-                ))}
-                {!positions.length ? <EmptyRow colSpan={6} /> : null}
-              </tbody>
-            </table>
-            <div className="totals">
-              <span>Realized {formatDecimal(totals.realized)}</span>
-              <span>Unrealized {formatDecimal(totals.unrealized)}</span>
-            </div>
-          </Panel>
-
-          <Panel title="Violations">
-            <table>
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Type</th>
-                  <th>Severity</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {violations.map((violation) => (
-                  <tr key={violation.id}>
-                    <td>{violation.client_id}</td>
-                    <td>{violation.violation_type}</td>
-                    <td>{violation.severity}</td>
-                    <td>{violation.message}</td>
-                  </tr>
-                ))}
-                {!violations.length ? <EmptyRow colSpan={4} /> : null}
-              </tbody>
-            </table>
-          </Panel>
-
-          <Panel className="wide" title="Analytics">
-            <div className="analytics-grid">
-              <MetricList
-                rows={analytics?.top_traded_isins ?? []}
-                title="Top ISINs"
-                value={(row) => `${row.isin}: ${row.transaction_count}`}
-              />
-              <MetricList
-                rows={analytics?.average_holding_time_per_client ?? []}
-                title="Holding Time"
-                value={(row) => `${row.client_id}: ${row.average_holding_days} days`}
-              />
-              <MetricList
-                rows={analytics?.isin_concentration_report ?? []}
-                title="Concentration"
-                value={(row) =>
-                  `${row.isin}: ${row.client_percentage}% (${row.clients.join(", ")})`
-                }
-              />
-              <div className="metric-block">
-                <h3>Volatility</h3>
-                <p>
-                  {analytics?.most_volatile_client
-                    ? `${analytics.most_volatile_client.client_id}: ${formatDecimal(
-                        analytics.most_volatile_client.value_range
-                      )}`
-                    : "No data"}
-                </p>
-              </div>
-            </div>
-          </Panel>
-        </section>
+        <div className="tab-content">
+          {activeTab === "positions" && <PositionsPanel positions={positions} />}
+          {activeTab === "violations" && <ViolationsPanel violations={violations} />}
+          {activeTab === "analytics" && <AnalyticsPanel analytics={analytics} />}
+        </div>
       </section>
     </main>
   );
-}
-
-function Panel({ children, className = "", title }) {
-  return (
-    <section className={`panel ${className}`}>
-      <h2>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function UploadSummary({ result }) {
-  return (
-    <div className={`banner ${result.status === "success" ? "success" : "warning"}`}>
-      <strong>{result.status}</strong>
-      <span>
-        {result.persisted_rows} persisted, {result.invalid_rows} invalid of{" "}
-        {result.total_rows} rows
-      </span>
-    </div>
-  );
-}
-
-function EmptyRow({ colSpan }) {
-  return (
-    <tr>
-      <td className="empty-cell" colSpan={colSpan}>
-        No rows
-      </td>
-    </tr>
-  );
-}
-
-function MetricList({ rows, title, value }) {
-  return (
-    <div className="metric-block">
-      <h3>{title}</h3>
-      {rows.length ? (
-        <ul>
-          {rows.map((row, index) => (
-            <li key={`${title}-${index}`}>{value(row)}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>No data</p>
-      )}
-    </div>
-  );
-}
-
-function sumDecimal(values) {
-  return values.reduce((total, value) => total + Number(value ?? 0), 0);
-}
-
-function formatDecimal(value) {
-  const numeric = Number(value ?? 0);
-  return Number.isFinite(numeric)
-    ? numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })
-    : String(value);
 }
 
 export default App;
