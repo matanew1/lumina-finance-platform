@@ -1,5 +1,3 @@
-import { formatDecimal } from "../utils/format.js";
-
 export function Panel({ children, className = "", title }) {
   return (
     <section className={`panel ${className}`}>

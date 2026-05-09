@@ -47,14 +47,15 @@ def _max_pairs_in_window(transactions: list[TransactionView]) -> int:
 
     # Iterate over each transaction, sorted by timestamp
     for transaction in transactions:  # pre-sorted by timestamp in detect_violations
+        # Window is half-open (cutoff, current]: a trade exactly DAY_TRADING_WINDOW
+        # ago is *outside* the 24h lookback. Using `<=` here (not `<`) prevents an
+        # off-by-one that would pair trades exactly 24h apart.
         cutoff = transaction.timestamp - DAY_TRADING_WINDOW
-        
-        # Remove buys that are not in the last 24 hours
-        while buys and buys[0] < cutoff:
+
+        while buys and buys[0] <= cutoff:
             buys.popleft()
-            
-        # Remove sells that are not in the last 24 hours
-        while sells and sells[0] < cutoff:
+
+        while sells and sells[0] <= cutoff:
             sells.popleft()
 
         # Add the current transaction to the appropriate deque
