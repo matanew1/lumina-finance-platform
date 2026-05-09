@@ -30,7 +30,7 @@ export function AnalyticsPanel({ analytics }) {
         <div className="metric-block">
           <h3>Volatility</h3>
           {analytics?.most_volatile_client ? (
-            <div className="metric-value">
+            <div className="metric-value metric-value-ltr" dir="ltr">
               <span className="metric-primary">
                 {analytics.most_volatile_client.client_id}
               </span>
@@ -38,8 +38,10 @@ export function AnalyticsPanel({ analytics }) {
                 Range {formatCurrency(analytics.most_volatile_client.value_range)}
               </span>
               <span className="metric-secondary">
-                {formatCurrency(analytics.most_volatile_client.min_portfolio_value)} -{" "}
-                {formatCurrency(analytics.most_volatile_client.max_portfolio_value)}
+                Min {formatCurrency(analytics.most_volatile_client.min_portfolio_value)}
+              </span>
+              <span className="metric-secondary">
+                Max {formatCurrency(analytics.most_volatile_client.max_portfolio_value)}
               </span>
             </div>
           ) : (

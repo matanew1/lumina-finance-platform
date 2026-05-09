@@ -1,3 +1,5 @@
+const DISPLAY_LOCALE = "en-US";
+
 export function sumDecimal(values) {
   return values.reduce((total, value) => total + Number(value ?? 0), 0);
 }
@@ -5,7 +7,7 @@ export function sumDecimal(values) {
 export function formatNumber(value, options = {}) {
   const numeric = Number(value ?? 0);
   return Number.isFinite(numeric)
-    ? numeric.toLocaleString(undefined, {
+    ? numeric.toLocaleString(DISPLAY_LOCALE, {
         maximumFractionDigits: 2,
         ...options
       })
@@ -30,5 +32,14 @@ export function formatPercent(value) {
 }
 
 export function formatDays(value) {
-  return `${formatNumber(value)} days`;
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return String(value);
+
+  const totalHours = Math.round(numeric * 24);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  if (days === 0) return `${hours}h`;
+  if (hours === 0) return `${days}d`;
+  return `${days}d ${hours}h`;
 }
