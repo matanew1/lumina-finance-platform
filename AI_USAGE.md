@@ -3,124 +3,120 @@
 ## AI Tools Used
 
 - **Codex**
-  - Generated the initial project plan and skeleton
+  - Used to generate the initial project plan and architecture skeleton
   - Helped scaffold backend, frontend, tests, and Docker setup
-  - Assisted with refactors and debugging
+  - Assisted with refactors and debugging during implementation
 
 - **Claude Code**
-  - Reviewed the financial logic, FIFO calculations, edge cases, and performance issues
+  - Used as a second-pass review tool for financial logic, FIFO correctness, edge cases, and performance issues
 
 ---
 
 ## How I Worked With AI
 
-1. Read the assignment to fully understand the requirements and financial rules.
+1. Read the assignment to fully understand the requirements, constraints, and financial rules.
 
-2. Asked Codex to generate:
+2. Defined the architecture direction first, then used Codex to generate:
    - a high-level implementation plan
-   - an initial project skeleton with `TODO / not implemented` placeholders
+   - a project skeleton with `TODO / not implemented` placeholders
 
-3. Reviewed and modified the generated structure to match the architecture I wanted.
+3. Aligned the generated structure with my intended architecture before writing core logic.
 
-4. Built the system incrementally from simpler flows to more complex financial logic, starting with one thin slice:
+4. Built the system incrementally, starting with a single working slice:
 
    `upload → service → repository → DB → response → UI`
 
-5. Manually reviewed all generated code:
-   - ran tests
-   - reorganized files
-   - simplified logic
-   - optimized performance-critical paths
+5. Implemented features step by step from simple flows to more complex financial logic.
 
-6. Used Claude Code as a second-pass reviewer for financial correctness, edge cases, and performance issues.
+6. Continuously validated and refined the system:
+   - ran tests after each major change
+   - simplified or refactored generated code when needed
+   - optimized performance-critical paths
 
 ---
 
 ## Example Prompts
 
-- Build a FastAPI + SQLAlchemy backend with routes, services, repositories, and tests for a transaction upload flow.
-- Create an initial project skeleton with `TODO / not implemented` placeholders.
-- Add FIFO position math with realized and unrealized P&L.
-- Add violation rules such as sell-before-buy, day trading, and risk concentration.
-- Add analytics endpoints and calculations.
-- Build a React + Vite UI for uploads, positions, violations, and analytics.
-- Review the FIFO implementation and identify precision or performance issues.
+- Build a FastAPI + SQLAlchemy backend with layered architecture (routes, services, repositories, tests) for a transaction upload flow.
+- Generate an initial project skeleton with placeholders (`TODO / not implemented`).
+- Implement FIFO-based position tracking with realized and unrealized P&L.
+- Add business rules for violations (sell-before-buy, day trading, risk concentration).
+- Build analytics endpoints for portfolio insights.
+- Create a React + Vite UI for uploading files and viewing results.
+- Review FIFO logic for correctness, performance, and edge cases.
 
 ---
 
 ## What Code Was Generated
 
-AI generated the initial scaffolding and first-pass implementations for:
+Codex generated the initial system structure and first-pass implementations for:
 
-- FastAPI backend structure
+- FastAPI backend setup
 - routes, services, repositories, and schemas
 - SQLAlchemy models
 - upload pipeline
-- FIFO logic
-- violation rules
+- FIFO engine for position tracking
+- violation detection rules
 - analytics calculations
 - React dashboard
-- tests
-- Docker Compose setup
+- test suite
+- Docker Compose environment
 
-I later reviewed, reorganized, optimized, and corrected the implementation manually.
+This code was treated as a starting point and later revised heavily.
 
 ---
 
 ## What I Modified
 
-### Architecture
+### Architecture Alignment
 
-- Reorganized the backend into layered folders under `backend/app`
-- Split services by domain:
+- Reorganized backend into clear layers under `backend/app`
+- Split business logic into domains:
   - transactions
   - clients
   - positions
   - violations
   - analytics
-- Moved DB access into repositories
-- Simplified unnecessary abstractions
-- Replaced the `ViolationRule` abstract class with simple callable functions
+- Ensured DB access is fully isolated in repositories
+- Replaced abstract rule system with simple callable functions
 
-### Performance
+### Performance Improvements
 
-- Moved FIFO recomputation from read-time into the upload pipeline
-- Replaced list front-removal with `collections.deque` and `popleft()` to avoid O(n²) behavior
-- Added running totals to make position reads O(1)
+- Moved FIFO computation from read-time to write-time (upload pipeline)
+- Replaced list-based FIFO queue with `collections.deque` to avoid O(n²) behavior
+- Introduced running totals to make position reads O(1)
 
-### Financial Correctness
+### Financial Logic Improvements
 
-I manually reviewed and improved the financial algorithms instead of relying on the initial generated logic.
+I reviewed and refined financial logic manually to ensure correctness and simplicity:
 
-Key improvements included:
+- Rewrote realized and unrealized P&L calculations for clarity and correctness
+- Fixed 24-hour trading window edge case where trades exactly at the boundary were incorrectly included in the active window
+- Simplified FIFO lot handling for better readability and correctness
+- Reduced repeated traversal of open lots in position calculations
 
-- Rewriting realized and unrealized P&L calculations for better correctness and readability
-- Fixing 24-hour trading window edge case where trades exactly 24h old were incorrectly included in the active window
-- Simplifying parts of the FIFO implementation for better correctness and readability
-- Optimizing position calculations to avoid repeated traversal of open lots
-
-### Reliability
+### Reliability Fixes
 
 - Fixed valid CSV uploads incorrectly returning `400`
-- Added proper `201 / 400 / 409` status handling
-- Fixed incorrect client retrieval logic
-- Resolved circular import issues during schema cleanup
+- Standardized API status handling (`201 / 400 / 409`)
+- Corrected client retrieval logic
+- Fixed circular import issues during schema refactor
 
 ---
 
 ## Mistakes And How I Fixed Them
 
-- FIFO positions were recomputed on every read request.
-  - I moved recomputation into the upload pipeline and persisted the results.
+- FIFO recomputation was happening on every read request
+  - Fixed by persisting computed positions during upload
 
-- FIFO processing used inefficient list front-removal.
-  - I replaced it with `collections.deque` and `popleft()`.
+- FIFO implementation used list front-removal causing O(n²) performance
+  - Fixed by replacing with `collections.deque`
 
-- 24-hour trading window incorrectly included trades exactly 24 hours old.
-  - I fixed the boundary condition logic so the window behaves correctly at the exact cutoff time.
+- 24-hour trading window incorrectly included boundary-edge trades
+  - Fixed by correcting time comparison logic to properly exclude exact boundary violations
 
-- `GET /clients` incorrectly depended on positions data.
-  - I changed it to read from transactions instead.
+- `GET /clients` depended incorrectly on derived position data
+  - Fixed by sourcing directly from transactions
 
-- Schema cleanup introduced circular imports.
-  - I reorganized imports and shared schemas.
+- Circular imports introduced during schema refactoring
+  - Fixed by restructuring shared schema imports
