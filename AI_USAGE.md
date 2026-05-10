@@ -1,71 +1,126 @@
 # AI Usage
 
-## Tools
+## AI Tools Used
 
-- **Codex** — wrote and refactored code.
-- **Claude Code** — reviewed structure and ran a deep check on finance logic.
+- **Codex**
+  - Generated the initial project plan and skeleton
+  - Helped scaffold backend, frontend, tests, and Docker setup
+  - Assisted with refactors and debugging
+
+- **Claude Code**
+  - Reviewed the financial logic, FIFO calculations, edge cases, and performance issues
+
+---
 
 ## How I Worked With AI
 
-- I built one thin slice first (upload → service → repo → DB → response → UI). This way I caught wiring bugs early.
-- I treated every AI answer as a draft. I read the diff, ran the tests, then renamed and moved code before asking for the next change.
-- I let failing tests guide my fixes. I did not refactor on a guess.
-- I ran a second review pass only on places where bugs hide silently: FIFO math, the 24-hour window, and `Decimal` precision. I asked for a graded audit, not a generic review.
-- I only fixed audit notes I could prove with a number example. I skipped the rest.
+1. Read the assignment to fully understand the requirements and financial rules.
+
+2. Asked Codex to generate:
+   - a high-level implementation plan
+   - an initial project skeleton with `TODO / not implemented` placeholders
+
+3. Reviewed and modified the generated structure to match the architecture I wanted.
+
+4. Built the system incrementally from simpler flows to more complex financial logic, starting with one thin slice:
+
+   `upload → service → repository → DB → response → UI`
+
+5. Manually reviewed all generated code:
+   - ran tests
+   - reorganized files
+   - simplified logic
+   - optimized performance-critical paths
+
+6. Used Claude Code as a second-pass reviewer for financial correctness, edge cases, and performance issues.
+
+---
 
 ## Example Prompts
 
 - Build a FastAPI + SQLAlchemy backend with routes, services, repositories, and tests for a transaction upload flow.
-- Add FIFO position math with realized and unrealized P&L, saved per ISIN.
-- Add violation rules: invalid values, sell before buy, day trading (more than 3 buy/sell pairs in 24h), and risk concentration (one ISIN over 50% of the portfolio).
-- Add analytics: top 3 traded ISINs, average holding time per client, most volatile client, and ISINs held by more than 70% of clients.
-- Build a React + Vite UI that uploads the file and shows clients, positions, violations, and analytics.
-- Act as a senior finance auditor and grade the FIFO math, the 24-hour window, and `Decimal` precision.
+- Create an initial project skeleton with `TODO / not implemented` placeholders.
+- Add FIFO position math with realized and unrealized P&L.
+- Add violation rules such as sell-before-buy, day trading, and risk concentration.
+- Add analytics endpoints and calculations.
+- Build a React + Vite UI for uploads, positions, violations, and analytics.
+- Review the FIFO implementation and identify precision or performance issues.
 
-## What Was Generated
+---
 
-- FastAPI app, routers per feature, error handlers, and response schemas.
-- SQLAlchemy models and repositories for transactions, positions, violations, and clients.
-- Upload pipeline: parse CSV/XLSX → validate → save → recompute positions → run violation rules.
-- FIFO engine, four violation rules, and four analytics calculations.
-- Pytest suite for the API and the business logic.
-- React UI with upload and four data sections.
-- Docker Compose for Postgres, backend, and frontend.
+## What Code Was Generated
+
+AI generated the initial scaffolding and first-pass implementations for:
+
+- FastAPI backend structure
+- routes, services, repositories, and schemas
+- SQLAlchemy models
+- upload pipeline
+- FIFO logic
+- violation rules
+- analytics calculations
+- React dashboard
+- tests
+- Docker Compose setup
+
+I later reviewed, reorganized, optimized, and corrected the implementation manually.
+
+---
 
 ## What I Modified
 
-- Moved the backend into `backend/app` with clear folders: `routes / services / repositories / schemas / helpers`.
-- Split services by domain (transactions, clients, positions, violations, analytics). All DB calls now live in repositories.
-- Replaced the `ViolationRule` abstract class with a `Callable` type. Each rule is now a plain `detect_*` function.
-- Rewrote the day-trading window to use two timestamp deques instead of one big deque with manual counters.
-- Moved `TransactionView` and `PositionView` into `schemas/shared.py` and deleted three duplicates.
-- Added running totals (`total_quantity`, `total_cost_basis`) to `PositionState`. Reads are O(1) and have no rounding drift.
-- Rounded money fields at the API boundary with `MONEY_QUANTUM = Decimal("0.000001")` to match the DB `Numeric(18, 6)`.
-- Made settings required from `backend/.env` or environment. No more silent fallbacks.
+### Architecture
+
+- Reorganized the backend into layered folders under `backend/app`
+- Split services by domain:
+  - transactions
+  - clients
+  - positions
+  - violations
+  - analytics
+- Moved DB access into repositories
+- Simplified unnecessary abstractions
+- Replaced the `ViolationRule` abstract class with simple callable functions
+
+### Performance
+
+- Moved FIFO recomputation from read-time into the upload pipeline
+- Replaced list front-removal with `collections.deque` and `popleft()` to avoid O(n²) behavior
+- Added running totals to make position reads O(1)
+
+### Financial Correctness
+
+I manually reviewed and improved the financial algorithms instead of relying on the initial generated logic.
+
+Key improvements included:
+
+- Rewriting realized and unrealized P&L calculations for better correctness and readability
+- Fixing 24-hour trading window edge case where trades exactly 24h old were incorrectly included in the active window
+- Simplifying parts of the FIFO implementation for better correctness and readability
+- Optimizing position calculations to avoid repeated traversal of open lots
+
+### Reliability
+
+- Fixed valid CSV uploads incorrectly returning `400`
+- Added proper `201 / 400 / 409` status handling
+- Fixed incorrect client retrieval logic
+- Resolved circular import issues during schema cleanup
+
+---
 
 ## Mistakes And How I Fixed Them
 
-- **Valid CSV uploads returned 400.** I fixed parsing and error mapping. Now 201 on success, 400 on bad file, 409 on duplicate IDs.
-- **Positions endpoint recomputed FIFO on every read.** I moved FIFO to the upload step. The endpoint now reads from the DB.
-- **FIFO used a list with front removal (O(n²)).** I switched to `collections.deque` and `popleft()`.
-- **`GET /clients` read from positions.** Clients with only invalid or fully-closed trades disappeared. I switched to reading from the transactions table.
-- **24-hour window was off by one moment.** It used `<`, so trades exactly 24h old still paired. I changed both loops to `<=` for `(t-24h, t]`.
-- **`unrealized_pnl` leaked rounding error.** It divided cost basis and multiplied it back. I rewrote it as `market_price * total_quantity - total_cost_basis`.
-- **`PositionState` walked all lots on every read.** I added running totals updated on each buy and sell.
-- **Schema cleanup caused a circular import.** I made `analytics_service.py` import the schema from the service layer directly.
-- **Analytics were placeholders.** I replaced them with the four required calculations.
+- FIFO positions were recomputed on every read request.
+  - I moved recomputation into the upload pipeline and persisted the results.
 
-## Claude's Adversarial Review
+- FIFO processing used inefficient list front-removal.
+  - I replaced it with `collections.deque` and `popleft()`.
 
-I asked Claude Code to act as a senior finance auditor and grade the FIFO engine, the 24-hour window, `PositionState` mutability, short-sell guards, and `Decimal` precision. Findings I fixed:
+- 24-hour trading window incorrectly included trades exactly 24 hours old.
+  - I fixed the boundary condition logic so the window behaves correctly at the exact cutoff time.
 
-- **FIFO precision drift (high).** `unrealized_pnl = quantity * (market_price - average_cost)` divided cost basis then multiplied it back. This leaked sub-cent error. → Rewrote as `market_price * total_quantity - total_cost_basis`.
-- **Day-trading window off by one (medium).** Strict `<` kept trades exactly 24h old in the window. → Switched both loops to `<=` and added a comment for `(t-24h, t]`.
-- **O(L) reads in `PositionState` (medium).** `quantity`, `average_cost`, and `unrealized_pnl` each walked `open_lots`. `as_result()` walked it three times. → Added running totals updated on each trade. Reads are O(1).
-- **Money rounding at the boundary (medium).** `Decimal` values flowed to the API at full precision, then DB rounded to `Numeric(18,6)`. The API and DB disagreed. → Rounded at the response with `MONEY_QUANTUM = Decimal("0.000001")`.
-- **List front removal (low).** `list.pop(0)` is O(n²) under heavy selling. → Switched to `collections.deque` + `popleft()`.
+- `GET /clients` incorrectly depended on positions data.
+  - I changed it to read from transactions instead.
 
-Findings I skipped on purpose:
-- **Concurrency hardening on uploads.** Out of scope for a one-process demo with SQLite.
-- **Exact regulator definition of a "buy/sell pair".** The brief is loose. I matched adjacent buy ↔ sell to follow the spec.
-
+- Schema cleanup introduced circular imports.
+  - I reorganized imports and shared schemas.
