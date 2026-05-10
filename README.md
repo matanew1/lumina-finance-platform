@@ -205,17 +205,6 @@ Rules:
 - `Price > 0`
 - `Action` is `Buy` or `Sell`
 
-## Assumptions
-
-- **Market price** for unrealized P&L is the price of the most recent transaction
-  observed for that `(client_id, isin)`. There is no live quote feed.
-- **Day trading rule** counts buy/sell pairs *per ISIN* within a 24h sliding
-  window. A client with 2 pairs of ISIN-A and 2 pairs of ISIN-B in the same day
-  is not flagged.
-- The 24h window is half-open `(t-24h, t]`: a trade exactly 24h old is outside.
-- FIFO ties on identical timestamps are broken by `transaction_id` lexicographic
-  order.
-
 ## Tests
 
 Backend:
